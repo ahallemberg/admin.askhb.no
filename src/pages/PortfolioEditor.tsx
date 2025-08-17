@@ -6,6 +6,8 @@ import ExperienceCard from '../components/ExperienceCard';
 import ExperienceDialog from '../components/ExperienceDialog';
 import PersonalInfoSection from '../components/PersonalInfoSection';
 import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem } from '../types/props';
+import { fetchFromR2 } from '../func/data';
+import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
 const PortfolioEditor: React.FC = () => {
@@ -14,6 +16,9 @@ const PortfolioEditor: React.FC = () => {
         experiences: [],
         education: []
     });
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -27,32 +32,32 @@ const PortfolioEditor: React.FC = () => {
     
     // Load initial data
     useEffect(() => {
-        const initialData: PortfolioData = {
-            personalInfo: {
-                name: "Ask Hallem-Berg",
-                title: "Master's student in Computer Science | Deputy Chief Engineer at Ascend | Machine Learning Engineer Intern at Q-Free",
-                about: "With a strong passion for technology and programming since the age of 14, I have continuously sought opportunities to develop my skills through both academic and professional pursuits."
-            },
-            experiences: [
-                {
-                    title: "Deputy Chief Engineer",
-                    company: "Ascend Aerial Robotics Team - Trondheim",
-                    date: "Apr. 2024 - today",
-                    description: "Responsible for overseeing Ascend's four technical groups. Recruited 21 engineers from a pool of 200+ applicants from NTNU.",
-                    readMoreUrl: "https://www.askhb.no",
-                    skills: ["Team Leadership", "Project Management", "System Integration", "Recruitment"]
-                }
-            ],
-            education: [
-                {
-                    degree: "Master of Science in Computer Science",
-                    institution: "The Norwegian University of Science and Technology - Trondheim",
-                    date: "Aug. 2023 - today",
-                    description: ["5-year Engineering Master's program"]
-                }
-            ]
-        };
-        setPortfolio(initialData);
+        const loadPortfolioData = async () => {
+        try {
+            setIsLoading(true);
+            setLoadError(null);
+            
+            // Fetch all data in parallel
+            const [personalInfo, experiences, education] = await Promise.all([
+                fetchFromR2<PersonalInfo>(R2_GET_ENDPOINT + PERSONAL_INFO_PATH),
+                fetchFromR2<ExperienceItem[]>(R2_GET_ENDPOINT + EXPERIENCE_PATH),
+                fetchFromR2<EducationItem[]>(R2_GET_ENDPOINT + EDUCATION_PATH)
+            ]);
+            
+            setPortfolio({
+                personalInfo,
+                experiences,
+                education
+            });
+            
+        } catch (error) {
+            console.error('Error loading portfolio data:', error);
+            setLoadError(error instanceof Error ? error.message : 'Failed to load portfolio data');
+        } finally {
+            setIsLoading(false);
+        }
+        }
+    loadPortfolioData();
     }, []);
     
     // Personal info handlers
@@ -100,11 +105,48 @@ const PortfolioEditor: React.FC = () => {
     };
     
     // Save portfolio
-    const savePortfolio = () => {
-        console.log('Portfolio Data:', JSON.stringify(portfolio, null, 2));
-        alert('Portfolio saved! Check console for JSON output.');
+    const savePortfolio = async () => {
+        try {
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Custom-API-Key': import.meta.env.VITE_WORKER_SHARED_SECRET
+            };
+
+            
+            const saveRequests = [
+                fetch(R2_PUT_ENDPOINT + PERSONAL_INFO_PATH, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(portfolio.personalInfo)
+                }),
+                fetch(R2_PUT_ENDPOINT + EXPERIENCE_PATH, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(portfolio.experiences)
+                }),
+                fetch(R2_PUT_ENDPOINT + EDUCATION_PATH, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(portfolio.education)
+                })
+            ];
+            
+            const responses = await Promise.all(saveRequests);
+            
+            const failedRequests = responses.filter(response => !response.ok);
+            
+            if (failedRequests.length === 0) {
+                alert('Portfolio saved successfully!');
+                console.log('All files saved successfully');
+            } else {
+                alert(`Failed to save ${failedRequests.length} file(s). Check console for details.`);
+                console.error('Some saves failed:', failedRequests);
+            }
+        } catch (error) {
+            alert('Failed to save portfolio. Please check your connection.');
+            console.error('Save error:', error);
+        }
     };
-    
     // Get default experience/education for dialog
     const getDefaultExperience = (): ExperienceItem => ({
         title: '',
@@ -137,7 +179,21 @@ const PortfolioEditor: React.FC = () => {
             </button>
           </div>
         </header>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-600">Loading portfolio data...</div>
+          </div>
+        )}
         
+        {/* Error State */}
+        {loadError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800">Error loading portfolio: {loadError}</p>
+          </div>
+        )}
+        {!isLoading && (
+            <>
         <main className="container mx-auto py-8 max-w-6xl">
           {/* Personal Info Section */}
           <PersonalInfoSection
@@ -195,8 +251,7 @@ const PortfolioEditor: React.FC = () => {
             </div>
           </section>
         </main>
-        
-        {/* Dialogs */}
+           {/* Dialogs */}
         <ExperienceDialog
           experience={
             experienceDialog.editIndex !== undefined
@@ -220,6 +275,9 @@ const PortfolioEditor: React.FC = () => {
           onClose={() => setEducationDialog({ isOpen: false })}
           onSave={handleSaveEducation}
         />
+        </>
+        )}
+     
       </div>
     </div>
   );
