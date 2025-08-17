@@ -84,7 +84,7 @@ const ExperienceDialog: React.FC<{
             <textarea
               value={tempItem.description}
               onChange={(e) => setTempItem(prev => ({ ...prev, description: e.target.value }))}
-              rows={4}
+              rows={6}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors resize-none"
             />
           </div>
