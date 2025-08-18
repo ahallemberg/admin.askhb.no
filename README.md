@@ -1,69 +1,42 @@
-# React + TypeScript + Vite
+# [admin.askhb.no](https://admin.askhb.no)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A minimalist portfolio editor that saves data directly to R2 bucket via Cloudflare Worker.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+Portfolio Editor → worker.askhb.no → R2 Bucket (r2.askhb.no)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **Frontend**: React component with inline editing
+- **Backend**: Cloudflare Worker with R2 binding
+- **Storage**: Three JSON files in R2 bucket
+- **Auth**: Cloudflare Zero Trust
+- **Hosting**: Cloudflare Pages
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## File Structure
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+r2.askhb.no/
+├── personalInfo.json    # Name, title, about
+├── experiences.json     # Work experience array
+└── education.json       # Education array
+```
+
+## Setup
+
+- **Worker endpoint**: `https://worker.askhb.no`
+- **Environment variable**: `VITE_WORKER_SHARED_SECRET`
+- **Build process**: Cloudflare Pages (auto-deploys with secret injection)
+- **Authentication**: Cloudflare Zero Trust
+
+## Data Flow
+
+**Save Process:**
+1. Editor sends 3 PUT requests (personalInfo, experiences, education)
+2. Worker authenticates and forwards to R2
+3. R2 stores each as separate JSON file
+
+**Load Process:**
+1. Main portfolio fetches from `r2.askhb.no/*.json`
+2. Direct R2 access (no worker needed for reads)
