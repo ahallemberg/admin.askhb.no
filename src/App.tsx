@@ -1,11 +1,14 @@
-import PortfolioEditor from "./pages/PortfolioEditor"
-
+import { useEffect } from 'react';
+import PortfolioEditor from './pages/PortfolioEditor'
 
 function App() {
-
-  return (
-    <PortfolioEditor />
-  )
+    useEffect(() => {
+        document.body.classList.add('bg-gray-100');
+    }, [])
+    
+    return (
+        <PortfolioEditor />
+    )
 };
 
 export default App
