@@ -1,4 +1,4 @@
-# [admin.askhb.no](https://admin.askhb.no)
+# admin.askhb.no
 
 A minimalist portfolio editor that saves data directly to R2 bucket via Cloudflare Worker.
 
