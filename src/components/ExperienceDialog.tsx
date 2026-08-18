@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { ExperienceItem } from "../types/props";
 import { X } from "lucide-react";
 
@@ -11,11 +11,14 @@ const ExperienceDialog: React.FC<{
 }> = ({ experience, isOpen, isEditing, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(experience);
     const [newSkill, setNewSkill] = useState('');
-    
-    useEffect(() => {
+
+    // Reset the draft when a different experience is passed in
+    const [lastExperience, setLastExperience] = useState(experience);
+    if (experience !== lastExperience) {
+        setLastExperience(experience);
         setTempItem(experience);
-    }, [experience]);
-    
+    }
+
     const addSkill = () => {
         if (newSkill && !tempItem.skills.includes(newSkill)) {
             setTempItem(prev => ({

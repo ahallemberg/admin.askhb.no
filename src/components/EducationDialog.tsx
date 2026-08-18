@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { EducationItem } from "../types/props";
 import { X, Trash2} from 'lucide-react';
 
@@ -10,11 +10,14 @@ const EducationDialog: React.FC<{
     onSave: (education: EducationItem) => void;
 }> = ({ education, isOpen, isEditing, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(education);
-    
-    useEffect(() => {
+
+    // Reset the draft when a different education entry is passed in
+    const [lastEducation, setLastEducation] = useState(education);
+    if (education !== lastEducation) {
+        setLastEducation(education);
         setTempItem(education);
-    }, [education]);
-    
+    }
+
     const addDescription = () => {
         setTempItem(prev => ({
             ...prev,

@@ -1,9 +1,10 @@
 import { useState, type ReactElement } from 'react';
+import type { DragHandleProps } from '../types/props';
 
 interface DraggableListProps<T> {
     items: T[];
     onReorder: (newItems: T[]) => void;
-    renderItem: (item: T, index: number, dragHandleProps: any) => ReactElement;
+    renderItem: (item: T, index: number, dragHandleProps: DragHandleProps) => ReactElement;
 }
 
 const DraggableList = <T,>({ items, onReorder, renderItem }: DraggableListProps<T>) => {
