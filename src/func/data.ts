@@ -6,7 +6,7 @@ async function fetchFromR2<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
-async function uploadToR2(data: any, endpoint: string) {
+async function uploadToR2(data: unknown, endpoint: string) {
   const response = await fetch(endpoint, {
     method: 'PUT',
     headers: {

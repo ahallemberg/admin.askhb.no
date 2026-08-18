@@ -1,11 +1,11 @@
-import type { EducationItem } from "../types/props";
+import type { EducationItem, DragHandleProps } from "../types/props";
 import { Edit, Trash2, GripVertical } from "lucide-react";
 
 const EducationCard: React.FC<{
     education: EducationItem;
     onEdit: () => void;
     onDelete: () => void;
-    dragHandleProps?: any;
+    dragHandleProps?: DragHandleProps;
 }> = ({ education, onEdit, onDelete, dragHandleProps }) => (
     <div className="mb-6 group relative bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         {/* Drag handle */}

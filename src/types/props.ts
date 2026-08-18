@@ -26,4 +26,9 @@ interface PortfolioData {
   education: EducationItem[];
 }
 
-export type { PersonalInfo, ExperienceItem, EducationItem, PortfolioData };
+interface DragHandleProps {
+  draggable: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+}
+
+export type { PersonalInfo, ExperienceItem, EducationItem, PortfolioData, DragHandleProps };
