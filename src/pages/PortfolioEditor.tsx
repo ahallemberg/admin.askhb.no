@@ -116,6 +116,14 @@ const PortfolioEditor: React.FC = () => {
     };
     
     const savePortfolio = async () => {
+        // Never write the empty initial state over the bucket. Without this the
+        // editor would PUT blank strings and empty arrays over every entry if it
+        // saved before the load finished or after it failed, and R2 keeps no
+        // versions to restore from.
+        if (isLoading || loadError) {
+            return;
+        }
+
         try {
             const headers = {
                 'Content-Type': 'application/json',
@@ -182,7 +190,13 @@ const PortfolioEditor: React.FC = () => {
                         <h1 className="text-3xl font-bold">Portfolio Editor</h1>
                         <button
                             onClick={savePortfolio}
-                            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                            disabled={isLoading || !!loadError}
+                            title={
+                                isLoading ? 'Waiting for the portfolio to load'
+                                    : loadError ? 'Cannot save: the portfolio failed to load'
+                                    : undefined
+                            }
+                            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                         >
                             <Save className="w-5 h-5" />
                             Save Portfolio
@@ -204,7 +218,10 @@ const PortfolioEditor: React.FC = () => {
                     </div>
                 )}
 
-                {!isLoading && (
+                {/* Only render the editor once real data is in. On a load failure
+                    the state is still the empty initial value, and showing that as
+                    if it were the portfolio invites the user to save over it. */}
+                {!isLoading && !loadError && (
                     <>
                         <main className="container mx-auto py-8 max-w-6xl">
                             {/* Personal Info Section */}
