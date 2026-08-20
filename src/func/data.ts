@@ -22,4 +22,21 @@ async function uploadToR2(data: unknown, endpoint: string) {
   return response;
 }
 
-export { fetchFromR2, uploadToR2 }
+async function uploadFileToR2(file: File, endpoint: string, apiKey: string) {
+  const response = await fetch(endpoint, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+      'X-Custom-API-Key': apiKey
+    },
+    body: file
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response;
+}
+
+export { fetchFromR2, uploadToR2, uploadFileToR2 }

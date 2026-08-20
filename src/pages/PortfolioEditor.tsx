@@ -5,6 +5,7 @@ import EducationDialog from '../components/EducationDialog';
 import ExperienceCard from '../components/ExperienceCard';
 import ExperienceDialog from '../components/ExperienceDialog';
 import PersonalInfoSection from '../components/PersonalInfoSection';
+import CvSection from '../components/CvSection';
 import DraggableList from '../components/DraggableList';
 import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem } from '../types/props';
 import { fetchFromR2 } from '../func/data';
@@ -208,6 +209,12 @@ const PortfolioEditor: React.FC = () => {
                         <main className="container mx-auto py-8 max-w-6xl">
                             {/* Personal Info Section */}
                             <PersonalInfoSection
+                                personalInfo={portfolio.personalInfo}
+                                onUpdate={handlePersonalInfoChange}
+                            />
+
+                            {/* CV Section */}
+                            <CvSection
                                 personalInfo={portfolio.personalInfo}
                                 onUpdate={handlePersonalInfoChange}
                             />
