@@ -51,6 +51,8 @@ The worker stores the body with `MAIN_BUCKET.put(key, request.body)` and does no
 
 **Saving is three independent PUTs with no transaction** (`savePortfolio` in `src/pages/PortfolioEditor.tsx`). A partial failure leaves R2 in a mixed state — e.g. reordered experiences saved but personal info not. Failures are surfaced with `alert()` and a console log.
 
+**Saving is gated on a successful load, and must stay that way.** The editor's initial state is empty (`{name:'',title:'',about:''}`, `[]`, `[]`). If it saves before the fetch resolves or after it fails, it PUTs that empty state over all three files, and R2 has no versioning and the worker no DELETE — the content is gone. Both the Save button and `savePortfolio` itself check `isLoading || loadError`, and the editor body renders only when neither is set. Don't remove any of the three.
+
 `uploadToR2` in `src/func/data.ts` is dead code; the editor builds its own `fetch` calls. `noUnusedLocals` does not catch unused exports.
 
 ## Conventions
