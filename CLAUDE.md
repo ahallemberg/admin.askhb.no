@@ -35,9 +35,13 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 ### The CV upload writes a binary through the same worker
 
-`CvSection` PUTs the chosen PDF to `worker.askhb.no/cv.pdf` and then sets `personalInfo.cvUrl`, which is what makes the portfolio render its Download CV button. The upload happens immediately; the `cvUrl` field is only persisted when Save is pressed, so uploading without saving leaves the file in the bucket but no button on the site.
+`CvSection` PUTs the chosen PDF to `worker.askhb.no/cv.pdf` and then sets `personalInfo.cvUrl`, which is what makes the portfolio render its Download CV button.
 
-The worker stores the body with `MAIN_BUCKET.put(key, request.body)` and does not pass `httpMetadata`, so the uploaded PDF has no stored content type and R2 serves it as a download rather than rendering it inline. Fixing that means a one-line worker change and a redeploy.
+**Uploading is itself a publish, for every upload after the first.** The key is always `/cv.pdf`, so once `cvUrl` points there, a replacement is live the moment the PUT returns — Save only updates the link. Save still matters, because `cvUrl` carries a `?v=<timestamp>` cache buster: `r2.askhb.no` serves the PDF with `max-age=14400`, so without a fresh query string a replacement stays hidden behind the edge cache for up to 4 hours.
+
+Each upload takes a ticket from a `useRef` counter and only the newest may write state. Without it, a slow upload landing after the user removed the CV would silently set `cvUrl` again. The remove button is also disabled while an upload is in flight. Don't drop either guard.
+
+Removing only clears `cvUrl`; the PDF stays in the bucket and remains publicly reachable at its URL. The worker supports no DELETE, so there is no way to take a CV offline from this UI.
 
 ### readMoreUrl points at the Quartz site
 
