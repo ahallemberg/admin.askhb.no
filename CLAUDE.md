@@ -51,7 +51,7 @@ Removing only clears `cvUrl`; the PDF stays in the bucket and remains publicly r
 
 **`.env` holds `VITE_WORKER_SHARED_SECRET`.** It is gitignored (`.gitignore:26`) and untracked — keep it that way, and don't commit the value in any other form (an `.env.example`, a README snippet, a test fixture).
 
-**The "shared secret" is not secret.** `VITE_`-prefixed variables are inlined into the client bundle at build time, so it ships in the public JavaScript of a deployed build. The real access control is Cloudflare Zero Trust in front of the app; treat the header as a speed bump, not authentication.
+**`X-Custom-API-Key` is not authentication.** A `VITE_`-prefixed variable is build-time inlined, not a server-side secret, so never reason about this app's security from that header alone. Access control lives in front of the app, not in it.
 
 **Saving is three independent PUTs with no transaction** (`savePortfolio` in `src/pages/PortfolioEditor.tsx`). A partial failure leaves R2 in a mixed state — e.g. reordered experiences saved but personal info not. Failures are surfaced with `alert()` and a console log.
 
