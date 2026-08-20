@@ -16,8 +16,16 @@ const CvSection: React.FC<{
 }> = ({ personalInfo, onUpdate }) => {
     const [status, setStatus] = useState<Status>({ state: 'idle' });
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Every upload takes a ticket. Only the newest one is allowed to write state,
+    // so a slow request that finishes after a newer upload — or after the user
+    // removed the CV — cannot resurrect a link or report a stale result.
+    const latestUpload = useRef(0);
+
+    const isUploading = status.state === 'uploading';
+    const hasCv = !!personalInfo.cvUrl;
 
     const handleFile = async (file: File) => {
+        const ticket = ++latestUpload.current;
         setStatus({ state: 'uploading' });
 
         try {
@@ -27,12 +35,17 @@ const CvSection: React.FC<{
                 import.meta.env.VITE_WORKER_SHARED_SECRET
             );
 
-            // The portfolio shows its download button only when cvUrl is set, so
-            // point it at the file we just uploaded. Saved with the rest of the
-            // portfolio when Save is pressed.
-            onUpdate('cvUrl', R2_GET_ENDPOINT + CV_PATH);
+            if (ticket !== latestUpload.current) return;
+
+            // Every upload overwrites the same key, and r2.askhb.no serves it with
+            // a 4 hour max-age, so without a changing query string a replacement
+            // stays invisible behind the edge cache. The portfolio also shows its
+            // download button only when cvUrl is set.
+            onUpdate('cvUrl', `${R2_GET_ENDPOINT}${CV_PATH}?v=${Date.now()}`);
             setStatus({ state: 'done' });
         } catch (error) {
+            if (ticket !== latestUpload.current) return;
+
             setStatus({
                 state: 'error',
                 message: error instanceof Error ? error.message : 'Upload failed'
@@ -41,8 +54,12 @@ const CvSection: React.FC<{
     };
 
     const handleRemove = () => {
+        // Invalidate any upload still in flight, otherwise it would set cvUrl again
+        // when it lands and undo this.
+        latestUpload.current++;
+
         // Clears the link so the portfolio hides the button. The file itself
-        // stays in the bucket.
+        // stays in the bucket and remains publicly reachable at its URL.
         onUpdate('cvUrl', '');
         setStatus({ state: 'idle' });
     };
@@ -65,7 +82,9 @@ const CvSection: React.FC<{
                         </a>
                         <button
                             onClick={handleRemove}
-                            className="text-gray-400 hover:text-red-600 transition-colors"
+                            disabled={isUploading}
+                            title={isUploading ? 'Wait for the upload to finish' : 'Remove the CV link from the portfolio'}
+                            className="text-gray-400 hover:text-red-600 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
                             aria-label="Remove CV from the portfolio"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -73,7 +92,9 @@ const CvSection: React.FC<{
                     </div>
                 ) : (
                     <p className="text-sm text-gray-500">
-                        No CV linked. The portfolio hides its download button until one is uploaded.
+                        No CV linked. The portfolio hides its download button until one is
+                        uploaded. Note that an uploaded PDF is publicly reachable at its URL
+                        whether or not it is linked.
                     </p>
                 )}
 
@@ -92,18 +113,17 @@ const CvSection: React.FC<{
                 <div className="flex items-center gap-4 mt-4">
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        disabled={status.state === 'uploading'}
-                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
+                        disabled={isUploading}
+                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
                     >
                         <Upload className="w-4 h-4" />
-                        {status.state === 'uploading'
-                            ? 'Uploading...'
-                            : personalInfo.cvUrl ? 'Replace PDF' : 'Upload PDF'}
+                        {isUploading ? 'Uploading...' : hasCv ? 'Replace PDF' : 'Upload PDF'}
                     </button>
 
                     {status.state === 'done' && (
                         <p className="text-sm text-gray-600">
-                            Uploaded. Press Save to publish the change.
+                            Uploaded. The file is already public; press Save so the
+                            site links this version instead of a cached one.
                         </p>
                     )}
                     {status.state === 'error' && (

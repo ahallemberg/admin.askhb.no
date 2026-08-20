@@ -33,7 +33,10 @@ async function uploadFileToR2(file: File, endpoint: string, apiKey: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+    // statusText is always empty over HTTP/2, which worker.askhb.no serves, so
+    // on its own it renders as "Upload failed: 403 " with no reason at all.
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Upload failed: ${response.status} ${detail || response.statusText || 'no response body'}`);
   }
 
   return response;
