@@ -2,6 +2,7 @@ interface PersonalInfo {
   name: string;
   title: string;
   about: string;
+  cvUrl?: string;
 }
 
 interface ExperienceItem {

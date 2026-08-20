@@ -4,5 +4,6 @@ const R2_PUT_ENDPOINT = "https://worker.askhb.no"
 const EDUCATION_PATH = "/education.json"
 const EXPERIENCE_PATH = "/experiences.json"
 const PERSONAL_INFO_PATH = "/personalinfo.json"
+const CV_PATH = "/cv.pdf"
 
-export { R2_GET_ENDPOINT, EDUCATION_PATH, EXPERIENCE_PATH, PERSONAL_INFO_PATH, R2_PUT_ENDPOINT }
+export { R2_GET_ENDPOINT, EDUCATION_PATH, EXPERIENCE_PATH, PERSONAL_INFO_PATH, CV_PATH, R2_PUT_ENDPOINT }

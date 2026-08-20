@@ -27,11 +27,17 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 - **Reads** go straight to `https://r2.askhb.no` (public, no auth).
 - **Writes** go to `https://worker.askhb.no`, a Cloudflare Worker with an R2 binding, authenticated with an `X-Custom-API-Key` header.
-- Three objects: `/personalinfo.json`, `/experiences.json`, `/education.json` (`src/constants/app.ts`).
+- Three JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection`.
 
 ### The JSON shape is a contract across three places
 
 `src/types/props.ts` here, `src/types/props.ts` in the askhb.no repo (same shapes, named `ExperienceItemProps` / `EducationItemProps`), and the live JSON in R2 must all agree. Neither app validates at runtime — askhb.no casts the fetched JSON straight to its types — so a mismatch shows up as a broken render, not a fetch error. Changing a field means changing all three.
+
+### The CV upload writes a binary through the same worker
+
+`CvSection` PUTs the chosen PDF to `worker.askhb.no/cv.pdf` and then sets `personalInfo.cvUrl`, which is what makes the portfolio render its Download CV button. The upload happens immediately; the `cvUrl` field is only persisted when Save is pressed, so uploading without saving leaves the file in the bucket but no button on the site.
+
+The worker stores the body with `MAIN_BUCKET.put(key, request.body)` and does not pass `httpMetadata`, so the uploaded PDF has no stored content type and R2 serves it as a download rather than rendering it inline. Fixing that means a one-line worker change and a redeploy.
 
 ### readMoreUrl points at the Quartz site
 
