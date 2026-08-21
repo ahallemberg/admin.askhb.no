@@ -1095,9 +1095,9 @@ git checkout -b unsaved-changes-guard
 2-space indent.
 
 ```ts
-// Treats an absent key and an explicit `undefined` as equal. The dialogs set
-// readMoreUrl to undefined rather than deleting it, so a JSON.stringify comparison
-// would report a change where there is none.
+// Structural comparison for the plain JSON trees fetched from R2. Key order is
+// irrelevant (every edit path rebuilds objects with {...prev}), and an absent key
+// equals an explicit `undefined`. Plain JSON only — no NaN, Date, Map or Set.
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -1323,7 +1323,7 @@ gh pr create --title "Warn before discarding unsaved edits" \
 - An 'Unsaved changes' marker sits beside Save.
 - savePortfolio now names which of the three PUTs failed and keeps the editor dirty unless all three succeed.
 
-Dirty state compares against a snapshot taken after load-time date normalisation, so a freshly loaded editor is not reported as dirty. deepEqual treats an absent key and an explicit undefined as equal, which JSON.stringify comparison would not."
+Dirty state compares against a snapshot taken after load-time date normalisation, so a freshly loaded editor is not reported as dirty. deepEqual is key-order independent, which JSON.stringify comparison is not — and key order changes every time a {...prev} spread rebuilds an object."
 ```
 
 ---
@@ -1342,3 +1342,33 @@ Checked against the spec:
 - **Not in the spec, added here:** the `setSaveTick` re-render nudge (Task 4 Step 7), needed because `savedSnapshot` is a ref.
 
 Type consistency: `DateRange` / `DateParts` are defined once in Task 2 Step 2 and referenced with those exact names in Steps 3, 5, 6, 7. `PickerState` is defined and exported in Step 3 and imported in Step 5. `PublishedPage` is defined in Task 3 Step 3 and imported in Steps 4 and 5. `deepEqual` is defined in Task 4 Step 2 and imported in Steps 3, 4, 5.
+
+---
+
+## Amendments during execution
+
+The plan above is kept as written. These are the points where execution departed from it, and why. Where the two disagree, this section and the spec are correct.
+
+**Task 1, Step 2 — `useMemo` replaced by module constants plus a `key`.** The specified `useMemo(getDefaultExperience, [experienceDialog.isOpen])` fails `npm run lint`: `react-hooks/use-memo` (v7, compiler-aware) rejects a non-inline function argument, and `react-hooks/exhaustive-deps` flags the reset-key dependency as unnecessary. The step's assurance that exhaustive-deps would not complain was wrong. Replaced with frozen module-level `BLANK_EXPERIENCE` / `BLANK_EDUCATION` constants and a `key` on each dialog, which is React's documented way to reset state. The dialogs' `lastExperience` / `lastEducation` identity-comparison blocks became redundant and were deleted. Side benefit: remounting also resets the half-typed `newSkill` field, which `useMemo` would not have.
+
+**Task 1, Step 3 — `whitespace-pre-line` removed.** The step specified it verbatim, but askhb.no uses no such class anywhere, so it contradicted the spec's own claim that the only removals are `FadeIn` and dark-mode classes. The preview would have preserved newlines the live site collapses.
+
+**Task 2, Step 3 — `parseMonth` matches exactly, not by prefix.** The specified `cleaned.startsWith(bare)` resolved `junk 2024` to June, `octopus 2024` to October, and 11 similar cases. That defeats the guarantee that makes bucket-wide normalisation safe: instead of returning `null` and leaving the value alone, garbage was rewritten into a plausible wrong date. Replaced with a per-month spellings table (abbreviation, full name, plus `sept`).
+
+**Task 2 — added `isValidRange`.** `normaliseDate` trusted a stored `dateRange` unconditionally, so a hand-edited `{year: 2020, month: 13}` rendered as the literal string `"undefined 2020"` and would be persisted over a good date. A malformed stored range is now ignored and the `date` string reparsed instead.
+
+**Task 2 — added incomplete-date feedback.** A half-filled picker emits `null`, and `handleDateChange` returns early, so the preview kept showing the old value with no indication the change had been discarded. The picker now says so, and also warns when a range runs backwards. Stored years outside the offered list are folded into the options rather than rendering the select blank.
+
+**Task 2, Step 4 — verification compiles the real module.** Rather than copy-pasting function bodies into a script (which would drift), `src/func/dates.ts` is compiled with `npx esbuild` and exercised against the live R2 JSON.
+
+**Task 3 — added an explicit `pagesLoading` state.** With only `pages` and `loadFailed`, "index not loaded yet" was indistinguishable from "not in the index", so a valid stored URL rendered as `⚠ Not found` under the text "This URL is not a published page" while the fetch was still in flight — inviting the user to select None and destroy a working link.
+
+**Task 4, Step 5 — `useState` instead of `useRef` plus `setSaveTick`.** State re-renders naturally, so the tick counter was unnecessary. Semantics are identical: `savePortfolio`'s closure captures `portfolio` at call time, so the snapshot always records the bytes actually PUT, and a mid-flight edit correctly shows as unsaved.
+
+**Task 4, Step 7 — `Promise.allSettled`, not `Promise.all`.** `fetch` rejects on network-level failure, and `Promise.all` abandons the other two PUTs without cancelling them — they can still reach R2. The catch block then reported "Failed to save portfolio", implying nothing was written, in exactly the mixed-state case this feature exists to surface.
+
+**Task 4 — three additions.** A `saveFailed` flag keeps the editor dirty after a failed save even when the user had made no edits of their own (without it the spec's "a mixed R2 state stays visibly unsaved" was false in that case). An `isSaving` guard stops a double-click issuing six PUTs and two snapshot writes racing. A `migrationPending` notice surfaces the queued date rewrite, which the dirty indicator deliberately hides.
+
+**Task 4 — no backdrop handler.** The step called for one, but neither dialog's overlay has an `onClick` and nothing listens for Escape, so there is no dismissal path to guard.
+
+**Delivery — branches are stacked, not each cut from `main`.** Task 2 needs Task 1's dialog structure and Task 3 needs its identity fix, and nothing is being merged without review, so each branch is based on its predecessor and each PR targets the previous one.
