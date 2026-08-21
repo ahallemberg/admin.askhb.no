@@ -13,7 +13,7 @@ npm run preview  # serve the production build locally
 
 No test framework is configured — no test script, no vitest/jest. Don't invent test commands; verify with `npm run build` and `npm run dev`.
 
-`npm run build` type-checks before bundling under `strict` plus `noUnusedLocals` / `noUnusedParameters`, so an unused variable or import fails the build, not just the lint.
+`npm run build` type-checks before bundling under `strict` plus `noUnusedLocals` / `noUnusedParameters`, so an unused variable or import fails the build, not just the lint. Unused *exports* are the blind spot: nothing here flags a helper that no module imports, so dead code in `src/func/` survives both the type-check and the lint — check the callers by hand before assuming an exported function is still in use.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ The portfolio at askhb.no renders content fetched at runtime from an R2 bucket; 
 PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← askhb.no
 ```
 
-- **Reads** go straight to `https://r2.askhb.no` (public, no auth).
+- **Reads** go straight to `https://r2.askhb.no` (public, no auth), through `fetchFromR2` in `src/func/data.ts` — or `fetchFromR2OrDefault`, which additionally returns a caller-supplied fallback on 404 so an object that does not exist in the bucket yet can still be edited into existence.
 - **Writes** go to `https://worker.askhb.no`, a Cloudflare Worker with an R2 binding, authenticated with an `X-Custom-API-Key` header.
 - Three JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection`.
 
@@ -61,7 +61,7 @@ Removing only clears `cvUrl`; the PDF stays in the bucket and remains publicly r
 
 **Saving is gated on a successful load, and must stay that way.** The editor's initial state is empty (`{name:'',title:'',about:''}`, `[]`, `[]`). If it saves before the fetch resolves or after it fails, it PUTs that empty state over all three files, and R2 has no versioning and the worker no DELETE — the content is gone. Both the Save button and `savePortfolio` itself check `isLoading || loadError`, and the editor body renders only when neither is set. Don't remove any of the three.
 
-`uploadToR2` in `src/func/data.ts` is dead code; the editor builds its own `fetch` calls. `noUnusedLocals` does not catch unused exports.
+This is the same hazard that keeps `fetchFromR2OrDefault`'s fallback narrowed to a 404. Every other outcome — any other non-OK status, and any network-level rejection — must keep propagating into `loadError`, because a fallback on *any* failed read would turn a transient blip into an editor full of empty defaults that the next Save writes over content that was really there. Widening that condition is how you lose the bucket.
 
 ## Conventions
 
