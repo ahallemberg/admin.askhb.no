@@ -33,6 +33,8 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 `src/types/props.ts` here, `src/types/props.ts` in the askhb.no repo (same shapes, named `ExperienceItemProps` / `EducationItemProps`), and the live JSON in R2 must all agree. Neither app validates at runtime — askhb.no casts the fetched JSON straight to its types — so a mismatch shows up as a broken render, not a fetch error. Changing a field means changing all three.
 
+`dateRange` is the one deliberate exception. The editor writes `{ start, end?, ongoing? }` alongside `date` and treats it as the source of truth, recomputing `date` from it on every change — the `date` string is never edited by hand. askhb.no's `props.ts` does **not** declare it and never reads it: that app casts the fetched JSON and ignores unknown keys, so the field is inert there. The two type files therefore differ on purpose. Don't "fix" the divergence by adding `dateRange` to askhb.no unless that app starts rendering from it.
+
 ### The CV upload writes a binary through the same worker
 
 `CvSection` PUTs the chosen PDF to `worker.askhb.no/cv.pdf` and then sets `personalInfo.cvUrl`, which is what makes the portfolio render its Download CV button.

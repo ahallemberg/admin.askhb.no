@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import type { EducationItem } from "../types/props";
+import type { EducationItem, DateRange } from "../types/props";
 import { X, Trash2} from 'lucide-react';
 import EducationPreview from "./EducationPreview";
+import DateRangePicker from "./DateRangePicker";
+import { formatDateRange } from "../func/dates";
 
 const EducationDialog: React.FC<{
     education: EducationItem;
@@ -11,6 +13,14 @@ const EducationDialog: React.FC<{
     onSave: (education: EducationItem) => void;
 }> = ({ education, isOpen, isEditing, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(education);
+
+    // dateRange is the source of truth; `date` is derived from it so the two cannot
+    // disagree. A null range means the picker is still incomplete — leave the
+    // existing date alone rather than clearing it.
+    const handleDateChange = (range: DateRange | null) => {
+        if (!range) return;
+        setTempItem(prev => ({ ...prev, dateRange: range, date: formatDateRange(range) }));
+    };
 
     const addDescription = () => {
         setTempItem(prev => ({
@@ -70,16 +80,11 @@ const EducationDialog: React.FC<{
                             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                            <input
-                            type="text"
-                            placeholder="e.g., Aug. 2023 - today"
-                            value={tempItem.date}
-                            onChange={(e) => setTempItem(prev => ({ ...prev, date: e.target.value }))}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                            />
-                        </div>
+                        <DateRangePicker
+                            value={tempItem.dateRange}
+                            fallbackText={tempItem.date}
+                            onChange={handleDateChange}
+                        />
                     
                         <div>
                             <div className="flex justify-between items-center mb-3">

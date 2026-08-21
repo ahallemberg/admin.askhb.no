@@ -9,6 +9,7 @@ import CvSection from '../components/CvSection';
 import DraggableList from '../components/DraggableList';
 import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem } from '../types/props';
 import { fetchFromR2 } from '../func/data';
+import { normaliseDate } from '../func/dates';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
@@ -57,10 +58,12 @@ const PortfolioEditor: React.FC = () => {
                     fetchFromR2<EducationItem[]>(R2_GET_ENDPOINT + EDUCATION_PATH)
                 ]);
                 
+                // Backfill dateRange and canonicalise the date string for every entry.
+                // An entry whose date cannot be parsed comes back untouched.
                 setPortfolio({
                     personalInfo,
-                    experiences,
-                    education
+                    experiences: experiences.map(normaliseDate),
+                    education: education.map(normaliseDate)
                 });
                 
             } catch (error) {
