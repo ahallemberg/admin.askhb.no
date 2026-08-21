@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 .env
+# brainstorming visual companion scratch
+.superpowers/
