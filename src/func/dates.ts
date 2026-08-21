@@ -25,15 +25,31 @@ function formatDateRange(range: DateRange): string {
   return start + SEPARATOR + formatParts(range.end);
 }
 
+// Every spelling accepted for each month, lowercased and without a trailing period.
+// Matching is exact against this table rather than by prefix: a prefix match reads
+// "junk 2024" as June and "octopus 2024" as October, which would let normaliseDate
+// silently rewrite a junk date into a plausible wrong one instead of leaving it be.
+const MONTH_SPELLINGS = [
+  ['jan', 'january'],
+  ['feb', 'february'],
+  ['mar', 'march'],
+  ['apr', 'april'],
+  ['may'],
+  ['jun', 'june'],
+  ['jul', 'july'],
+  ['aug', 'august'],
+  ['sep', 'sept', 'september'],
+  ['oct', 'october'],
+  ['nov', 'november'],
+  ['dec', 'december']
+];
+
 // "Apr." / "apr" / "April" all resolve to 4. This case-insensitivity is what
 // absorbs the lowercase "aug." / "jun." already live in education.json.
 function parseMonth(token: string): number | undefined {
   const cleaned = token.trim().replace(/\.$/, '').toLowerCase();
   if (!cleaned) return undefined;
-  const index = MONTHS.findIndex(month => {
-    const bare = month.replace(/\.$/, '').toLowerCase();
-    return cleaned === bare || cleaned.startsWith(bare);
-  });
+  const index = MONTH_SPELLINGS.findIndex(spellings => spellings.includes(cleaned));
   return index === -1 ? undefined : index + 1;
 }
 
