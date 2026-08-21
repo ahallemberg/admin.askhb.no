@@ -6,20 +6,19 @@ async function fetchFromR2<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
-async function uploadToR2(data: unknown, endpoint: string) {
-  const response = await fetch(endpoint, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data, null, 2)
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+// Returns `fallback` only when the object does not exist yet, so a bucket missing
+// projects.json can still be edited into existence. Any other status — and any
+// network-level rejection — propagates, because loading empty over content that is
+// really there and then saving would destroy it, and R2 keeps no versions.
+async function fetchFromR2OrDefault<T>(endpoint: string, fallback: T): Promise<T> {
+  const response = await fetch(endpoint);
+  if (response.status === 404) {
+    return fallback;
   }
-  
-  return response;
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${endpoint}: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
 }
 
 async function uploadFileToR2(file: File, endpoint: string, apiKey: string) {
@@ -42,4 +41,4 @@ async function uploadFileToR2(file: File, endpoint: string, apiKey: string) {
   return response;
 }
 
-export { fetchFromR2, uploadToR2, uploadFileToR2 }
+export { fetchFromR2, fetchFromR2OrDefault, uploadFileToR2 }
