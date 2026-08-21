@@ -12,6 +12,13 @@ import { fetchFromR2 } from '../func/data';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
+// Stable blank drafts. A fresh object here would change the dialog's key-independent
+// prop identity on every render of this component; these never change, and the dialog
+// is instead remounted via `key` each time it opens. Neither dialog mutates these in
+// place — every edit path rebuilds the array — so sharing one instance is safe.
+const BLANK_EXPERIENCE: ExperienceItem = { title: '', company: '', date: '', description: '', skills: [] };
+const BLANK_EDUCATION: EducationItem = { degree: '', institution: '', date: '', description: [''] };
+
 const PortfolioEditor: React.FC = () => {
     const [portfolio, setPortfolio] = useState<PortfolioData>({
         personalInfo: { name: '', title: '', about: '' },
@@ -165,21 +172,6 @@ const PortfolioEditor: React.FC = () => {
         }
     };
 
-    // Get default experience/education for dialog
-    const getDefaultExperience = (): ExperienceItem => ({
-        title: '',
-        company: '',
-        date: '',
-        description: '',
-        skills: []
-    });
-    
-    const getDefaultEducation = (): EducationItem => ({
-        degree: '',
-        institution: '',
-        date: '',
-        description: ['']
-    });
     
     return (
         <div className="bg-gray-100 min-h-screen font-sans">
@@ -293,10 +285,11 @@ const PortfolioEditor: React.FC = () => {
 
                         {/* Dialogs */}
                         <ExperienceDialog
+                            key={`experience-${experienceDialog.isOpen}-${experienceDialog.editIndex ?? 'new'}`}
                             experience={
                                 experienceDialog.editIndex !== undefined
                                     ? portfolio.experiences[experienceDialog.editIndex]
-                                    : getDefaultExperience()
+                                    : BLANK_EXPERIENCE
                             }
                             isOpen={experienceDialog.isOpen}
                             isEditing={experienceDialog.editIndex !== undefined}
@@ -305,10 +298,11 @@ const PortfolioEditor: React.FC = () => {
                         />
                             
                         <EducationDialog
+                            key={`education-${educationDialog.isOpen}-${educationDialog.editIndex ?? 'new'}`}
                             education={
                                 educationDialog.editIndex !== undefined
                                     ? portfolio.education[educationDialog.editIndex]
-                                    : getDefaultEducation()
+                                    : BLANK_EDUCATION
                             }
                             isOpen={educationDialog.isOpen}
                             isEditing={educationDialog.editIndex !== undefined}
