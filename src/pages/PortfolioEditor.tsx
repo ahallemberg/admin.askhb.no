@@ -181,28 +181,21 @@ const PortfolioEditor: React.FC = () => {
                 'X-Custom-API-Key': import.meta.env.VITE_WORKER_SHARED_SECRET
             };
 
-            const saveRequests = [
-                fetch(R2_PUT_ENDPOINT + PERSONAL_INFO_PATH, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(portfolio.personalInfo)
-                }),
-                fetch(R2_PUT_ENDPOINT + EXPERIENCE_PATH, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(portfolio.experiences)
-                }),
-                fetch(R2_PUT_ENDPOINT + EDUCATION_PATH, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(portfolio.education)
-                })
+            // Name and payload travel together so that reordering these can never make
+            // a partial-failure report blame the wrong file.
+            const targets = [
+                { name: 'personalinfo.json', path: PERSONAL_INFO_PATH, body: portfolio.personalInfo },
+                { name: 'experiences.json', path: EXPERIENCE_PATH, body: portfolio.experiences },
+                { name: 'education.json', path: EDUCATION_PATH, body: portfolio.education }
             ];
-            
-            const responses = await Promise.all(saveRequests);
 
-            const names = ['personalinfo.json', 'experiences.json', 'education.json'];
-            const failed = names.filter((_, index) => !responses[index].ok);
+            const responses = await Promise.all(targets.map(target => fetch(R2_PUT_ENDPOINT + target.path, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify(target.body)
+            })));
+
+            const failed = targets.filter((_, index) => !responses[index].ok).map(target => target.name);
 
             if (failed.length === 0) {
                 // Only now does the on-screen state match what is in R2.
