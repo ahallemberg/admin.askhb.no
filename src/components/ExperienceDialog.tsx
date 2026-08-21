@@ -13,9 +13,10 @@ const ExperienceDialog: React.FC<{
     isEditing: boolean;
     publishedPages: PublishedPage[];
     pagesLoadFailed: boolean;
+    pagesLoading: boolean;
     onClose: () => void;
     onSave: (experience: ExperienceItem) => void;
-}> = ({ experience, isOpen, isEditing, publishedPages, pagesLoadFailed, onClose, onSave }) => {
+}> = ({ experience, isOpen, isEditing, publishedPages, pagesLoadFailed, pagesLoading, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(experience);
     const [newSkill, setNewSkill] = useState('');
 
@@ -100,6 +101,7 @@ const ExperienceDialog: React.FC<{
               value={tempItem.readMoreUrl}
               pages={publishedPages}
               loadFailed={pagesLoadFailed}
+              loading={pagesLoading}
               onChange={(url) => setTempItem(prev => ({ ...prev, readMoreUrl: url }))}
             />
           

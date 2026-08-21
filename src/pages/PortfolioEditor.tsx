@@ -41,6 +41,10 @@ const PortfolioEditor: React.FC = () => {
     // pages.askhb.no outage must never be able to block saving the portfolio.
     const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
     const [pagesLoadFailed, setPagesLoadFailed] = useState(false);
+    // Tracked explicitly rather than inferred from an empty list: "not loaded yet" and
+    // "not in the index" must not look alike, or a stored URL is labelled unpublished
+    // while the fetch is still in flight and the obvious fix is to clear it.
+    const [pagesLoading, setPagesLoading] = useState(true);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -88,7 +92,8 @@ const PortfolioEditor: React.FC = () => {
             .catch(error => {
                 console.error('Error loading published pages:', error);
                 setPagesLoadFailed(true);
-            });
+            })
+            .finally(() => setPagesLoading(false));
     }, []);
     
     const handlePersonalInfoChange = (field: keyof PersonalInfo, value: string) => {
@@ -320,6 +325,7 @@ const PortfolioEditor: React.FC = () => {
                             isEditing={experienceDialog.editIndex !== undefined}
                             publishedPages={publishedPages}
                             pagesLoadFailed={pagesLoadFailed}
+                            pagesLoading={pagesLoading}
                             onClose={() => setExperienceDialog({ isOpen: false })}
                             onSave={handleSaveExperience}
                         />
