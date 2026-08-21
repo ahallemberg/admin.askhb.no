@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ExperienceItem, DateRange, PortfolioLink } from "../types/props";
 import { X } from "lucide-react";
 import ExperiencePreview from "./ExperiencePreview";
+import { deepEqual } from "../func/compare";
 import DateRangePicker from "./DateRangePicker";
 import LinksEditor from "./LinksEditor";
 import { deriveReadMoreUrl } from "../func/links";
@@ -51,6 +52,17 @@ const ExperienceDialog: React.FC<{
         }));
     };
     
+    // Closing discards the draft outright, so confirm first when there is one.
+    const handleClose = () => {
+        // newSkill is a draft too: a skill typed but not yet added lives only here,
+        // so closing would drop it without the comparison below ever noticing.
+        const hasDraft = !deepEqual(tempItem, experience) || newSkill.trim() !== '';
+        if (hasDraft && !window.confirm('Discard changes to this entry?')) {
+            return;
+        }
+        onClose();
+    };
+
     if (!isOpen) return null;
     
     return (
@@ -61,7 +73,7 @@ const ExperienceDialog: React.FC<{
             {isEditing ? 'Edit' : 'Add'} Experience
           </h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -157,7 +169,7 @@ const ExperienceDialog: React.FC<{
 
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             Cancel

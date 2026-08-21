@@ -12,6 +12,7 @@ import { fetchFromR2 } from '../func/data';
 import { normaliseDate } from '../func/dates';
 import { normaliseLinks } from '../func/links';
 import { fetchPublishedPages, type PublishedPage } from '../func/pages';
+import { deepEqual } from '../func/compare';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
@@ -28,6 +29,21 @@ Object.freeze(BLANK_EXPERIENCE.skills);
 Object.freeze(BLANK_EDUCATION);
 Object.freeze(BLANK_EDUCATION.description);
 
+const plural = (count: number, singular: string, pluralForm: string) =>
+    `${count} ${count === 1 ? singular : pluralForm}`;
+
+// Spells out what the first save after the date migration will actually rewrite.
+const describeMigration = ({ reformatted, structured, linked }: { reformatted: number; structured: number; linked: number }) => {
+    const parts: string[] = [];
+    if (reformatted > 0) parts.push(`${plural(reformatted, 'date', 'dates')} will be reformatted`);
+    if (structured > 0) parts.push(`${plural(structured, 'entry', 'entries')} will gain structured dates`);
+    if (linked > 0) parts.push(`${plural(linked, 'link', 'links')} will be converted`);
+    const joined = parts.length > 1
+        ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+        : parts[0];
+    return `${joined} on the next save`;
+};
+
 const PortfolioEditor: React.FC = () => {
     const [portfolio, setPortfolio] = useState<PortfolioData>({
         personalInfo: { name: '', title: '', about: '' },
@@ -42,6 +58,20 @@ const PortfolioEditor: React.FC = () => {
     // pages.askhb.no outage must never be able to block saving the portfolio.
     const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
     const [pagesLoadFailed, setPagesLoadFailed] = useState(false);
+
+    // What is known to be in R2: set after a successful load and after a fully
+    // successful save. Anything else on screen means unsaved changes.
+    const [savedSnapshot, setSavedSnapshot] = useState<PortfolioData | null>(null);
+    // A failed save leaves R2 mixed even when the user had made no edits, so the
+    // editor must keep saying so rather than looking clean because nothing changed.
+    const [saveFailed, setSaveFailed] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    // What load-time normalisation changed, if anything. Kept separate from isDirty:
+    // folding it in would light that indicator on every load and train the user to
+    // ignore it, but leaving it unsaid hides a bucket-wide rewrite until some
+    // unrelated edit happens to trigger it. Self-clearing — once saved, the raw and
+    // normalised forms agree on every later load and this never appears again.
+    const [migration, setMigration] = useState<{ reformatted: number; structured: number; linked: number } | null>(null);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -67,11 +97,27 @@ const PortfolioEditor: React.FC = () => {
                 
                 // Backfill dateRange and canonicalise the date string for every entry.
                 // An entry whose date cannot be parsed comes back untouched.
-                setPortfolio({
+                const loaded: PortfolioData = {
                     personalInfo,
                     experiences: experiences.map(item => normaliseLinks(normaliseDate(item))),
                     education: education.map(normaliseDate)
-                });
+                };
+
+                // Counted, not just flagged: "3 dates will be reformatted" tells the
+                // user what a save is about to do to content they cannot otherwise see.
+                const before = [...experiences, ...education];
+                const after = [...loaded.experiences, ...loaded.education];
+                const reformatted = before.filter((item, i) => item.date !== after[i].date).length;
+                const structured = before.filter((item, i) => !item.dateRange && !!after[i].dateRange).length;
+                const linked = experiences.filter((item, i) => !item.links && !!loaded.experiences[i].links).length;
+                setMigration(reformatted > 0 || structured > 0 || linked > 0
+                    ? { reformatted, structured, linked }
+                    : null);
+
+                // Snapshot the normalised form, not the raw fetch: otherwise the editor
+                // would report unsaved changes the instant it finished loading.
+                setSavedSnapshot(loaded);
+                setPortfolio(loaded);
                 
             } catch (error) {
                 console.error('Error loading portfolio data:', error);
@@ -147,6 +193,20 @@ const PortfolioEditor: React.FC = () => {
         }));
     };
     
+    const isDirty = saveFailed || (savedSnapshot !== null && !deepEqual(portfolio, savedSnapshot));
+
+    useEffect(() => {
+        if (!isDirty) return;
+        const warn = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            // preventDefault alone is enough in current browsers; returnValue is what
+            // older Chrome and WebKit actually check.
+            event.returnValue = true;
+        };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [isDirty]);
+
     const savePortfolio = async () => {
         // Never write the empty initial state over the bucket. Without this the
         // editor would PUT blank strings and empty arrays over every entry if it
@@ -156,44 +216,66 @@ const PortfolioEditor: React.FC = () => {
             return;
         }
 
+        // Without this a double-click issues six PUTs, and the two savePortfolio
+        // closures race to set the snapshot.
+        if (isSaving) {
+            return;
+        }
+        setIsSaving(true);
+
         try {
             const headers = {
                 'Content-Type': 'application/json',
                 'X-Custom-API-Key': import.meta.env.VITE_WORKER_SHARED_SECRET
             };
 
-            const saveRequests = [
-                fetch(R2_PUT_ENDPOINT + PERSONAL_INFO_PATH, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(portfolio.personalInfo)
-                }),
-                fetch(R2_PUT_ENDPOINT + EXPERIENCE_PATH, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(portfolio.experiences)
-                }),
-                fetch(R2_PUT_ENDPOINT + EDUCATION_PATH, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(portfolio.education)
-                })
+            // Name and payload travel together so that reordering these can never make
+            // a partial-failure report blame the wrong file.
+            const targets = [
+                { name: 'personalinfo.json', path: PERSONAL_INFO_PATH, body: portfolio.personalInfo },
+                { name: 'experiences.json', path: EXPERIENCE_PATH, body: portfolio.experiences },
+                { name: 'education.json', path: EDUCATION_PATH, body: portfolio.education }
             ];
-            
-            const responses = await Promise.all(saveRequests);
-            
-            const failedRequests = responses.filter(response => !response.ok);
-            
-            if (failedRequests.length === 0) {
+
+            // allSettled, not all: fetch rejects on a network-level failure, and
+            // Promise.all would abandon the other two PUTs mid-flight without
+            // cancelling them. They can still land, so reporting "nothing was saved"
+            // from the catch would be the opposite of the truth.
+            const results = await Promise.allSettled(targets.map(target => fetch(R2_PUT_ENDPOINT + target.path, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify(target.body)
+            })));
+
+            const failed = targets
+                .filter((_, index) => {
+                    const result = results[index];
+                    return result.status !== 'fulfilled' || !result.value.ok;
+                })
+                .map(target => target.name);
+
+            if (failed.length === 0) {
+                // Only now does the on-screen state match what is in R2.
+                setSavedSnapshot(portfolio);
+                setSaveFailed(false);
+                setMigration(null);
                 alert('Portfolio saved successfully!');
                 console.log('All files saved successfully');
             } else {
-                alert(`Failed to save ${failedRequests.length} file(s). Check console for details.`);
-                console.error('Some saves failed:', failedRequests);
+                // The three PUTs are independent with no rollback, so a partial failure
+                // leaves R2 in a mixed state. Name the files so it is recoverable.
+                setSaveFailed(true);
+                alert(`Failed to save: ${failed.join(', ')}. R2 is now in a mixed state — fix the problem and save again.`);
+                console.error('Some saves failed:', failed, results);
             }
         } catch (error) {
+            // allSettled above means only a non-network bug reaches here, but a save
+            // that ended this way is still not a save that succeeded.
+            setSaveFailed(true);
             alert('Failed to save portfolio. Please check your connection.');
             console.error('Save error:', error);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -205,19 +287,31 @@ const PortfolioEditor: React.FC = () => {
                 <header className="py-8 text-center">
                     <div className="flex justify-between items-center">
                         <h1 className="text-3xl font-bold">Portfolio Editor</h1>
-                        <button
-                            onClick={savePortfolio}
-                            disabled={isLoading || !!loadError}
-                            title={
-                                isLoading ? 'Waiting for the portfolio to load'
-                                    : loadError ? 'Cannot save: the portfolio failed to load'
-                                    : undefined
-                            }
-                            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <Save className="w-5 h-5" />
-                            Save Portfolio
-                        </button>
+                        <div className="flex items-center gap-4">
+                            {isDirty && (
+                                <span className="text-sm text-amber-700">Unsaved changes</span>
+                            )}
+                            {!isDirty && migration && (
+                                <span className="text-sm text-gray-500">{describeMigration(migration)}</span>
+                            )}
+                            <button
+                                onClick={savePortfolio}
+                                // Do NOT add !isDirty here. The pending date migration is
+                                // not a user edit, so a dirty-gated button would make it
+                                // permanently unreachable.
+                                disabled={isLoading || !!loadError || isSaving}
+                                title={
+                                    isLoading ? 'Waiting for the portfolio to load'
+                                        : loadError ? 'Cannot save: the portfolio failed to load'
+                                        : isSaving ? 'Saving…'
+                                        : undefined
+                                }
+                                className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Save className="w-5 h-5" />
+                                {isSaving ? 'Saving…' : 'Save Portfolio'}
+                            </button>
+                        </div>
                     </div>
                 </header>
 
