@@ -54,7 +54,10 @@ const ExperienceDialog: React.FC<{
     
     // Closing discards the draft outright, so confirm first when there is one.
     const handleClose = () => {
-        if (!deepEqual(tempItem, experience) && !window.confirm('Discard changes to this entry?')) {
+        // newSkill is a draft too: a skill typed but not yet added lives only here,
+        // so closing would drop it without the comparison below ever noticing.
+        const hasDraft = !deepEqual(tempItem, experience) || newSkill.trim() !== '';
+        if (hasDraft && !window.confirm('Discard changes to this entry?')) {
             return;
         }
         onClose();

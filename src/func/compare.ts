@@ -1,6 +1,14 @@
-// Treats an absent key and an explicit `undefined` as equal. The dialogs set
-// readMoreUrl to undefined rather than deleting it, so a JSON.stringify comparison
-// would report a change where there is none.
+// Structural comparison for the plain JSON trees fetched from R2. Two properties
+// matter here and JSON.stringify comparison has neither:
+//
+//   1. Key order is irrelevant. Every edit path rebuilds objects with {...prev}, and
+//      a spread that reorders keys would otherwise register as an unsaved change.
+//   2. An absent key equals an explicit `undefined`, which is how the dialogs clear
+//      readMoreUrl. (JSON.stringify happens to agree here — it omits undefined-valued
+//      keys — so it is key order, not this, that rules stringify out.)
+//
+// Plain JSON only: NaN, Date, Map, Set and RegExp are not handled and would compare
+// as equal-if-empty. Nothing in PortfolioData holds any of them.
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
