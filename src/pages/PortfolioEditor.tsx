@@ -29,6 +29,17 @@ Object.freeze(BLANK_EXPERIENCE.skills);
 Object.freeze(BLANK_EDUCATION);
 Object.freeze(BLANK_EDUCATION.description);
 
+const plural = (count: number, singular: string, pluralForm: string) =>
+    `${count} ${count === 1 ? singular : pluralForm}`;
+
+// Spells out what the first save after the date migration will actually rewrite.
+const describeMigration = ({ reformatted, structured }: { reformatted: number; structured: number }) => {
+    const parts: string[] = [];
+    if (reformatted > 0) parts.push(`${plural(reformatted, 'date', 'dates')} will be reformatted`);
+    if (structured > 0) parts.push(`${plural(structured, 'entry', 'entries')} will gain structured dates`);
+    return `${parts.join(' and ')} on the next save`;
+};
+
 const PortfolioEditor: React.FC = () => {
     const [portfolio, setPortfolio] = useState<PortfolioData>({
         personalInfo: { name: '', title: '', about: '' },
@@ -51,11 +62,12 @@ const PortfolioEditor: React.FC = () => {
     // editor must keep saying so rather than looking clean because nothing changed.
     const [saveFailed, setSaveFailed] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    // Set when load-time normalisation changed something. Kept separate from isDirty:
-    // folding it in would light the indicator on every load and train the user to
+    // What load-time normalisation changed, if anything. Kept separate from isDirty:
+    // folding it in would light that indicator on every load and train the user to
     // ignore it, but leaving it unsaid hides a bucket-wide rewrite until some
-    // unrelated edit happens to trigger it.
-    const [migrationPending, setMigrationPending] = useState(false);
+    // unrelated edit happens to trigger it. Self-clearing — once saved, the raw and
+    // normalised forms agree on every later load and this never appears again.
+    const [migration, setMigration] = useState<{ reformatted: number; structured: number } | null>(null);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -79,8 +91,6 @@ const PortfolioEditor: React.FC = () => {
                     fetchFromR2<EducationItem[]>(R2_GET_ENDPOINT + EDUCATION_PATH)
                 ]);
                 
-                const raw: PortfolioData = { personalInfo, experiences, education };
-
                 // Backfill dateRange and canonicalise the date string for every entry.
                 // An entry whose date cannot be parsed comes back untouched.
                 const loaded: PortfolioData = {
@@ -89,7 +99,13 @@ const PortfolioEditor: React.FC = () => {
                     education: education.map(normaliseDate)
                 };
 
-                setMigrationPending(!deepEqual(raw, loaded));
+                // Counted, not just flagged: "3 dates will be reformatted" tells the
+                // user what a save is about to do to content they cannot otherwise see.
+                const before = [...experiences, ...education];
+                const after = [...loaded.experiences, ...loaded.education];
+                const reformatted = before.filter((item, i) => item.date !== after[i].date).length;
+                const structured = before.filter((item, i) => !item.dateRange && !!after[i].dateRange).length;
+                setMigration(reformatted > 0 || structured > 0 ? { reformatted, structured } : null);
 
                 // Snapshot the normalised form, not the raw fetch: otherwise the editor
                 // would report unsaved changes the instant it finished loading.
@@ -235,7 +251,7 @@ const PortfolioEditor: React.FC = () => {
                 // Only now does the on-screen state match what is in R2.
                 setSavedSnapshot(portfolio);
                 setSaveFailed(false);
-                setMigrationPending(false);
+                setMigration(null);
                 alert('Portfolio saved successfully!');
                 console.log('All files saved successfully');
             } else {
@@ -268,8 +284,8 @@ const PortfolioEditor: React.FC = () => {
                             {isDirty && (
                                 <span className="text-sm text-amber-700">Unsaved changes</span>
                             )}
-                            {!isDirty && migrationPending && (
-                                <span className="text-sm text-gray-500">Date formats will be updated on the next save</span>
+                            {!isDirty && migration && (
+                                <span className="text-sm text-gray-500">{describeMigration(migration)}</span>
                             )}
                             <button
                                 onClick={savePortfolio}
