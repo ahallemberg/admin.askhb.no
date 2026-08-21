@@ -4,6 +4,14 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    # Scoped to update-types on purpose: a bare `dependency-name` ignore also
+    # suppresses Dependabot SECURITY updates for that package, which we never
+    # want. Security PRs are enabled in repo settings and bypass these rules.
+    ignore:
+      # typescript-eslint peers on `>=4.8.4 <6.1.0`, so 6.1 and 7.x both break
+      # `npm run lint`. Patches within 6.0.x still come through.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       production-dependencies:
         applies-to: "version-updates"
