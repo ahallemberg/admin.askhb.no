@@ -135,9 +135,9 @@ const ExperienceDialog: React.FC<{
               </div>
           </div>
 
-          <div className="lg:sticky lg:top-0 self-start">
+          <div className="lg:sticky lg:top-6 self-start">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Live preview</p>
-            <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+            <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-100">
               <ExperiencePreview experience={tempItem} />
             </div>
           </div>

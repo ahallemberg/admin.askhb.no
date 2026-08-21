@@ -1,8 +1,9 @@
 import type { EducationItem } from "../types/props";
 
 // Mirrors askhb.no's src/components/EducationItem.tsx, minus the FadeIn wrapper
-// and its dark: classes (this app has no dark mode). Restyling the portfolio card
-// will make this preview stale — update both together.
+// and its dark: classes (this app has no dark mode), plus an 'Untitled' placeholder
+// so a fresh Add dialog does not preview an empty heading. Restyling the portfolio
+// card will make this preview stale — update both together.
 const EducationPreview: React.FC<{ education: EducationItem }> = ({ education }) => (
     <div>
         <h3 className="text-xl font-semibold">{education.degree || 'Untitled'}</h3>
