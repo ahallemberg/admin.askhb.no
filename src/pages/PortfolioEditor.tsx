@@ -33,11 +33,15 @@ const plural = (count: number, singular: string, pluralForm: string) =>
     `${count} ${count === 1 ? singular : pluralForm}`;
 
 // Spells out what the first save after the date migration will actually rewrite.
-const describeMigration = ({ reformatted, structured }: { reformatted: number; structured: number }) => {
+const describeMigration = ({ reformatted, structured, linked }: { reformatted: number; structured: number; linked: number }) => {
     const parts: string[] = [];
     if (reformatted > 0) parts.push(`${plural(reformatted, 'date', 'dates')} will be reformatted`);
     if (structured > 0) parts.push(`${plural(structured, 'entry', 'entries')} will gain structured dates`);
-    return `${parts.join(' and ')} on the next save`;
+    if (linked > 0) parts.push(`${plural(linked, 'link', 'links')} will be converted`);
+    const joined = parts.length > 1
+        ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+        : parts[0];
+    return `${joined} on the next save`;
 };
 
 const PortfolioEditor: React.FC = () => {
@@ -67,7 +71,7 @@ const PortfolioEditor: React.FC = () => {
     // ignore it, but leaving it unsaid hides a bucket-wide rewrite until some
     // unrelated edit happens to trigger it. Self-clearing — once saved, the raw and
     // normalised forms agree on every later load and this never appears again.
-    const [migration, setMigration] = useState<{ reformatted: number; structured: number } | null>(null);
+    const [migration, setMigration] = useState<{ reformatted: number; structured: number; linked: number } | null>(null);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -105,7 +109,10 @@ const PortfolioEditor: React.FC = () => {
                 const after = [...loaded.experiences, ...loaded.education];
                 const reformatted = before.filter((item, i) => item.date !== after[i].date).length;
                 const structured = before.filter((item, i) => !item.dateRange && !!after[i].dateRange).length;
-                setMigration(reformatted > 0 || structured > 0 ? { reformatted, structured } : null);
+                const linked = experiences.filter((item, i) => !item.links && !!loaded.experiences[i].links).length;
+                setMigration(reformatted > 0 || structured > 0 || linked > 0
+                    ? { reformatted, structured, linked }
+                    : null);
 
                 // Snapshot the normalised form, not the raw fetch: otherwise the editor
                 // would report unsaved changes the instant it finished loading.
