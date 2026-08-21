@@ -12,6 +12,19 @@ import { fetchFromR2 } from '../func/data';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
+// Stable blank drafts. A fresh object here would change the dialog's prop identity on
+// every render of this component; these never change, and the dialog is instead
+// remounted via `key` each time it opens. Frozen because they are shared instances
+// that also alias into portfolio.* if you open Add and save without typing: every
+// edit path already rebuilds the object and its arrays, and freezing makes that
+// self-enforcing instead of an invariant the next reader has to know about.
+const BLANK_EXPERIENCE: ExperienceItem = { title: '', company: '', date: '', description: '', skills: [] };
+const BLANK_EDUCATION: EducationItem = { degree: '', institution: '', date: '', description: [''] };
+Object.freeze(BLANK_EXPERIENCE);
+Object.freeze(BLANK_EXPERIENCE.skills);
+Object.freeze(BLANK_EDUCATION);
+Object.freeze(BLANK_EDUCATION.description);
+
 const PortfolioEditor: React.FC = () => {
     const [portfolio, setPortfolio] = useState<PortfolioData>({
         personalInfo: { name: '', title: '', about: '' },
@@ -165,21 +178,6 @@ const PortfolioEditor: React.FC = () => {
         }
     };
 
-    // Get default experience/education for dialog
-    const getDefaultExperience = (): ExperienceItem => ({
-        title: '',
-        company: '',
-        date: '',
-        description: '',
-        skills: []
-    });
-    
-    const getDefaultEducation = (): EducationItem => ({
-        degree: '',
-        institution: '',
-        date: '',
-        description: ['']
-    });
     
     return (
         <div className="bg-gray-100 min-h-screen font-sans">
@@ -293,10 +291,12 @@ const PortfolioEditor: React.FC = () => {
 
                         {/* Dialogs */}
                         <ExperienceDialog
+                            // Remounts on every open so the draft starts clean; see BLANK_EXPERIENCE above.
+                            key={`experience-${experienceDialog.isOpen}-${experienceDialog.editIndex ?? 'new'}`}
                             experience={
                                 experienceDialog.editIndex !== undefined
                                     ? portfolio.experiences[experienceDialog.editIndex]
-                                    : getDefaultExperience()
+                                    : BLANK_EXPERIENCE
                             }
                             isOpen={experienceDialog.isOpen}
                             isEditing={experienceDialog.editIndex !== undefined}
@@ -305,10 +305,12 @@ const PortfolioEditor: React.FC = () => {
                         />
                             
                         <EducationDialog
+                            // Remounts on every open so the draft starts clean; see BLANK_EDUCATION above.
+                            key={`education-${educationDialog.isOpen}-${educationDialog.editIndex ?? 'new'}`}
                             education={
                                 educationDialog.editIndex !== undefined
                                     ? portfolio.education[educationDialog.editIndex]
-                                    : getDefaultEducation()
+                                    : BLANK_EDUCATION
                             }
                             isOpen={educationDialog.isOpen}
                             isEditing={educationDialog.editIndex !== undefined}

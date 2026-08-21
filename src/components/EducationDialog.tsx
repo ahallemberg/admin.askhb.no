@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { EducationItem } from "../types/props";
 import { X, Trash2} from 'lucide-react';
+import EducationPreview from "./EducationPreview";
 
 const EducationDialog: React.FC<{
     education: EducationItem;
@@ -10,13 +11,6 @@ const EducationDialog: React.FC<{
     onSave: (education: EducationItem) => void;
 }> = ({ education, isOpen, isEditing, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(education);
-
-    // Reset the draft when a different education entry is passed in
-    const [lastEducation, setLastEducation] = useState(education);
-    if (education !== lastEducation) {
-        setLastEducation(education);
-        setTempItem(education);
-    }
 
     const addDescription = () => {
         setTempItem(prev => ({
@@ -43,7 +37,7 @@ const EducationDialog: React.FC<{
     
     return (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
                 <div className="flex justify-between items-center p-6 border-b border-gray-200">
                     <h3 className="text-xl font-semibold text-gray-900">
                         {isEditing ? 'Edit' : 'Add'} Education
@@ -56,64 +50,73 @@ const EducationDialog: React.FC<{
                     </button>
                 </div>
                 
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Degree</label>
-                        <input
-                        type="text"
-                        value={tempItem.degree}
-                        onChange={(e) => setTempItem(prev => ({ ...prev, degree: e.target.value }))}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Institution</label>
-                        <input
-                        type="text"
-                        value={tempItem.institution}
-                        onChange={(e) => setTempItem(prev => ({ ...prev, institution: e.target.value }))}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                        <input
-                        type="text"
-                        placeholder="e.g., Aug. 2023 - today"
-                        value={tempItem.date}
-                        onChange={(e) => setTempItem(prev => ({ ...prev, date: e.target.value }))}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                        />
-                    </div>
-                    
-                    <div>
-                        <div className="flex justify-between items-center mb-3">
-                            <label className="block text-sm font-medium text-gray-700">Description</label>
-                            <button
-                            onClick={addDescription}
-                            className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                            >
-                            + Add Item
-                            </button>
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Degree</label>
+                            <input
+                            type="text"
+                            value={tempItem.degree}
+                            onChange={(e) => setTempItem(prev => ({ ...prev, degree: e.target.value }))}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                            />
                         </div>
-                        <div className="space-y-3">
-                            {tempItem.description.map((desc, index) => (
-                                <div key={index} className="flex gap-2">
-                                    <input
-                                    type="text"
-                                    value={desc}
-                                    onChange={(e) => updateDescription(index, e.target.value)}
-                                    placeholder="Description item"
-                                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                                    />
-                                    <button
-                                    onClick={() => removeDescription(index)}
-                                    className="p-3 text-gray-400 hover:text-red-600 transition-colors"
-                                    >
-                                    <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Institution</label>
+                            <input
+                            type="text"
+                            value={tempItem.institution}
+                            onChange={(e) => setTempItem(prev => ({ ...prev, institution: e.target.value }))}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <input
+                            type="text"
+                            placeholder="e.g., Aug. 2023 - today"
+                            value={tempItem.date}
+                            onChange={(e) => setTempItem(prev => ({ ...prev, date: e.target.value }))}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                            />
+                        </div>
+                    
+                        <div>
+                            <div className="flex justify-between items-center mb-3">
+                                <label className="block text-sm font-medium text-gray-700">Description</label>
+                                <button
+                                onClick={addDescription}
+                                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                                >
+                                + Add Item
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {tempItem.description.map((desc, index) => (
+                                    <div key={index} className="flex gap-2">
+                                        <input
+                                        type="text"
+                                        value={desc}
+                                        onChange={(e) => updateDescription(index, e.target.value)}
+                                        placeholder="Description item"
+                                        className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                                        />
+                                        <button
+                                        onClick={() => removeDescription(index)}
+                                        className="p-3 text-gray-400 hover:text-red-600 transition-colors"
+                                        >
+                                        <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="lg:sticky lg:top-6 self-start">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Live preview</p>
+                        <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-100">
+                            <EducationPreview education={tempItem} />
                         </div>
                     </div>
                 </div>
