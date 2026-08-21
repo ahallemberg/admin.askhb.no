@@ -1,7 +1,9 @@
 import { useState } from "react";
-import type { ExperienceItem } from "../types/props";
+import type { ExperienceItem, DateRange } from "../types/props";
 import { X } from "lucide-react";
 import ExperiencePreview from "./ExperiencePreview";
+import DateRangePicker from "./DateRangePicker";
+import { formatDateRange } from "../func/dates";
 
 const ExperienceDialog: React.FC<{
     experience: ExperienceItem;
@@ -12,6 +14,14 @@ const ExperienceDialog: React.FC<{
 }> = ({ experience, isOpen, isEditing, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(experience);
     const [newSkill, setNewSkill] = useState('');
+
+    // dateRange is the source of truth; `date` is derived from it so the two cannot
+    // disagree. A null range means the picker is still incomplete — leave the
+    // existing date alone rather than clearing it.
+    const handleDateChange = (range: DateRange | null) => {
+        if (!range) return;
+        setTempItem(prev => ({ ...prev, dateRange: range, date: formatDateRange(range) }));
+    };
 
     const addSkill = () => {
         if (newSkill && !tempItem.skills.includes(newSkill)) {
@@ -67,16 +77,11 @@ const ExperienceDialog: React.FC<{
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Apr. 2024 - today"
-                  value={tempItem.date}
-                  onChange={(e) => setTempItem(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                />
-              </div>
+              <DateRangePicker
+                value={tempItem.dateRange}
+                fallbackText={tempItem.date}
+                onChange={handleDateChange}
+              />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
