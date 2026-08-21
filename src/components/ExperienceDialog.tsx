@@ -3,15 +3,19 @@ import type { ExperienceItem, DateRange } from "../types/props";
 import { X } from "lucide-react";
 import ExperiencePreview from "./ExperiencePreview";
 import DateRangePicker from "./DateRangePicker";
+import ReadMoreUrlSelect from "./ReadMoreUrlSelect";
+import type { PublishedPage } from "../func/pages";
 import { formatDateRange } from "../func/dates";
 
 const ExperienceDialog: React.FC<{
     experience: ExperienceItem;
     isOpen: boolean;
     isEditing: boolean;
+    publishedPages: PublishedPage[];
+    pagesLoadFailed: boolean;
     onClose: () => void;
     onSave: (experience: ExperienceItem) => void;
-}> = ({ experience, isOpen, isEditing, onClose, onSave }) => {
+}> = ({ experience, isOpen, isEditing, publishedPages, pagesLoadFailed, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(experience);
     const [newSkill, setNewSkill] = useState('');
 
@@ -92,16 +96,12 @@ const ExperienceDialog: React.FC<{
                 />
               </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Read More URL (optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://pages.askhb.no/my-experience"
-                  value={tempItem.readMoreUrl || ''}
-                  onChange={(e) => setTempItem(prev => ({ ...prev, readMoreUrl: e.target.value || undefined }))}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                />
-              </div>
+            <ReadMoreUrlSelect
+              value={tempItem.readMoreUrl}
+              pages={publishedPages}
+              loadFailed={pagesLoadFailed}
+              onChange={(url) => setTempItem(prev => ({ ...prev, readMoreUrl: url }))}
+            />
           
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Skills</label>

@@ -10,6 +10,7 @@ import DraggableList from '../components/DraggableList';
 import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem } from '../types/props';
 import { fetchFromR2 } from '../func/data';
 import { normaliseDate } from '../func/dates';
+import { fetchPublishedPages, type PublishedPage } from '../func/pages';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
@@ -35,6 +36,11 @@ const PortfolioEditor: React.FC = () => {
 
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+
+    // Deliberately separate from isLoading/loadError. Save is gated on those, and a
+    // pages.askhb.no outage must never be able to block saving the portfolio.
+    const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
+    const [pagesLoadFailed, setPagesLoadFailed] = useState(false);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -74,6 +80,15 @@ const PortfolioEditor: React.FC = () => {
             }
         }
         loadPortfolioData();
+    }, []);
+
+    useEffect(() => {
+        fetchPublishedPages()
+            .then(setPublishedPages)
+            .catch(error => {
+                console.error('Error loading published pages:', error);
+                setPagesLoadFailed(true);
+            });
     }, []);
     
     const handlePersonalInfoChange = (field: keyof PersonalInfo, value: string) => {
@@ -303,6 +318,8 @@ const PortfolioEditor: React.FC = () => {
                             }
                             isOpen={experienceDialog.isOpen}
                             isEditing={experienceDialog.editIndex !== undefined}
+                            publishedPages={publishedPages}
+                            pagesLoadFailed={pagesLoadFailed}
                             onClose={() => setExperienceDialog({ isOpen: false })}
                             onSave={handleSaveExperience}
                         />
