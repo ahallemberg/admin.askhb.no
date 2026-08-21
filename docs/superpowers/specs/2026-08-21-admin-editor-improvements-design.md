@@ -145,14 +145,14 @@ Its date line changes hands between PRs: in PR 1 it renders `tempItem.date` dire
 
 ## Feature 4 — Unsaved-changes guard
 
-**New:** `src/func/compare.ts` — a small recursive `deepEqual` that treats an absent key and an `undefined` value as equal. `JSON.stringify` comparison would false-positive whenever `readMoreUrl` is set to `undefined` rather than deleted, which is exactly what the current dialog code does.
+**New:** `src/func/compare.ts` — a small recursive `deepEqual`, key-order independent and treating an absent key as equal to an explicit `undefined`. Key order is the reason `JSON.stringify` comparison will not do: every edit path rebuilds objects with `{...prev}`, and a spread that reorders keys would register as an unsaved change. (`JSON.stringify` handles the `undefined` case correctly on its own — it omits undefined-valued keys — so that is not the deciding factor.)
 
 Four parts:
 
-1. **Dialog close.** Both dialogs deep-compare `tempItem` against the incoming prop. ✕, Cancel, or backdrop click with changes present triggers `window.confirm('Discard changes to this entry?')`. A blocking dialog, consistent with the `alert()` already used in `savePortfolio`.
+1. **Dialog close.** Both dialogs deep-compare `tempItem` against the incoming prop; the Experience dialog also counts a skill typed but not yet added. ✕ or Cancel with changes present triggers `window.confirm('Discard changes to this entry?')`. A blocking dialog, consistent with the `alert()` already used in `savePortfolio`. There is no backdrop or Escape handler to guard — the modal's overlay has no click handler and nothing listens for keydown.
 2. **Tab close.** A `beforeunload` handler in `PortfolioEditor`, registered only while dirty and removed when clean.
 3. **Dirty indicator.** An "Unsaved changes" marker beside the Save button. Dirty state is a deep comparison against a snapshot taken on successful load and reset after a fully successful save.
-4. **Partial save reporting.** `savePortfolio` performs three independent PUTs with no transaction. It will collect per-file results and report *which* of the three failed by name. The dirty flag clears only when all three succeed, so a mixed R2 state stays visibly unsaved.
+4. **Partial save reporting.** `savePortfolio` performs three independent PUTs with no transaction. It collects per-file results with `Promise.allSettled` and reports *which* of the three failed by name. `allSettled` rather than `all` matters: `fetch` rejects on a network-level failure, and `Promise.all` would abandon the other two PUTs without cancelling them — they can still reach R2, so reporting "nothing was saved" would be the opposite of the truth. A failed save also sets a `saveFailed` flag that keeps the editor marked dirty even when the user had made no edits of their own, so a mixed R2 state stays visibly unsaved.
 
 **All three existing save guards are preserved unchanged**: the Save button's `isLoading || loadError` check, the same check inside `savePortfolio`, and the conditional render of the editor body. R2 has no versioning and the worker no DELETE, so a regression here is unrecoverable.
 
@@ -193,7 +193,9 @@ Each gets its own Cloudflare Pages preview deploy to click through before mergin
 
 ## Migration consequence
 
-The first Save after PR 2 ships is a content migration, not an ordinary save. Every entry gains a `dateRange`, and the two lowercase education dates are rewritten (`aug.` → `Aug.`, `jun.` → `Jun.`). Because Save writes all three files wholesale, this touches every entry, not just the edited one. Review the previews before the first Save.
+The first Save after PR 2 ships is a content migration, not an ordinary save. All 10 entries gain a `dateRange`, and three education dates are rewritten (`aug.` → `Aug.`, `jun.` → `Jun.`). Because Save writes all three files wholesale, this touches every entry, not just the edited one.
+
+The editor says so rather than leaving it implicit. Load-time normalisation is compared against the raw fetch, and when they differ the header shows "Date formats will be updated on the next save". This is deliberately separate from the "Unsaved changes" indicator: folding it into the dirty flag would light that indicator on every page load and fire `beforeunload` on every tab close, training the user to ignore both. Leaving it unsaid entirely would be worse — the rewrite would then ride along silently with whatever unrelated edit happened to be saved first, possibly weeks later.
 
 ## Verification
 
