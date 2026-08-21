@@ -9,8 +9,12 @@ const ExperiencePreview: React.FC<{ experience: ExperienceItem }> = ({ experienc
         <h3 className="text-xl font-semibold">{experience.title || 'Untitled'}</h3>
         <p className="text-gray-600">{experience.company} | {experience.date}</p>
         <p className="mt-2 text-gray-700">{experience.description}</p>
-        {experience.readMoreUrl && (
-            <span className="inline-block mt-2 text-blue-600 text-sm">Read more →</span>
+        {(experience.links ?? []).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-x-4">
+                {experience.links?.map((link, index) => (
+                    <span key={index} className="text-blue-600 text-sm">{link.label} →</span>
+                ))}
+            </div>
         )}
         <div className="mt-2">
             {experience.skills.map((skill, index) => (

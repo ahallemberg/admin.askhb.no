@@ -1,17 +1,22 @@
 import { useState } from "react";
-import type { ExperienceItem, DateRange } from "../types/props";
+import type { ExperienceItem, DateRange, PortfolioLink } from "../types/props";
 import { X } from "lucide-react";
 import ExperiencePreview from "./ExperiencePreview";
 import DateRangePicker from "./DateRangePicker";
+import LinksEditor from "./LinksEditor";
+import { deriveReadMoreUrl } from "../func/links";
+import type { PublishedPage } from "../func/pages";
 import { formatDateRange } from "../func/dates";
 
 const ExperienceDialog: React.FC<{
     experience: ExperienceItem;
     isOpen: boolean;
     isEditing: boolean;
+    publishedPages: PublishedPage[];
+    pagesLoadFailed: boolean;
     onClose: () => void;
     onSave: (experience: ExperienceItem) => void;
-}> = ({ experience, isOpen, isEditing, onClose, onSave }) => {
+}> = ({ experience, isOpen, isEditing, publishedPages, pagesLoadFailed, onClose, onSave }) => {
     const [tempItem, setTempItem] = useState(experience);
     const [newSkill, setNewSkill] = useState('');
 
@@ -21,6 +26,12 @@ const ExperienceDialog: React.FC<{
     const handleDateChange = (range: DateRange | null) => {
         if (!range) return;
         setTempItem(prev => ({ ...prev, dateRange: range, date: formatDateRange(range) }));
+    };
+
+    // links is the source of truth; readMoreUrl is derived from the first one so an
+    // askhb.no build that predates multi-link support still renders something.
+    const handleLinksChange = (links: PortfolioLink[]) => {
+        setTempItem(prev => ({ ...prev, links, readMoreUrl: deriveReadMoreUrl(links) }));
     };
 
     const addSkill = () => {
@@ -92,16 +103,12 @@ const ExperienceDialog: React.FC<{
                 />
               </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Read More URL (optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://pages.askhb.no/my-experience"
-                  value={tempItem.readMoreUrl || ''}
-                  onChange={(e) => setTempItem(prev => ({ ...prev, readMoreUrl: e.target.value || undefined }))}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                />
-              </div>
+            <LinksEditor
+              links={tempItem.links ?? []}
+              pages={publishedPages}
+              pagesLoadFailed={pagesLoadFailed}
+              onChange={handleLinksChange}
+            />
           
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Skills</label>

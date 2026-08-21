@@ -16,6 +16,11 @@ interface DateRange {
   ongoing?: boolean;  // renders the end as "today"
 }
 
+interface PortfolioLink {
+  label: string;
+  url: string;
+}
+
 interface ExperienceItem {
   title: string;
   company: string;
@@ -23,7 +28,9 @@ interface ExperienceItem {
   dateRange?: DateRange;
   description: string;
   skills: string[];
+  // Derived from links[0] so an askhb.no that predates links keeps working.
   readMoreUrl?: string;
+  links?: PortfolioLink[];
 }
 
 interface EducationItem {
@@ -45,4 +52,4 @@ interface DragHandleProps {
   onDragStart: (e: React.DragEvent) => void;
 }
 
-export type { PersonalInfo, ExperienceItem, EducationItem, PortfolioData, DragHandleProps, DateParts, DateRange };
+export type { PersonalInfo, ExperienceItem, EducationItem, PortfolioData, DragHandleProps, DateParts, DateRange, PortfolioLink };
