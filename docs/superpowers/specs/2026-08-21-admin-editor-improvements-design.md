@@ -1,7 +1,7 @@
 # Admin editor improvements — structured dates, page picker, live preview, unsaved guard
 
 Date: 2026-08-21
-Repo: `admin.askhb.no` (askhb.no is **not** modified by this work)
+Repo: `admin.askhb.no`, plus one companion change in `askhb.no` (see the amendment at the end — the original design avoided touching it, and that no longer holds)
 
 ## Problem
 
@@ -28,7 +28,7 @@ Three related weaknesses in the same dialogs:
 | Source of truth | `dateRange` is authoritative; `date` is derived | `date` is recomputed on every change and is never directly editable, so the two cannot drift from the UI |
 | Format | `Apr. 2024 - Sep. 2025` | Matches 5 of 7 existing experience entries, so the site's appearance does not shift |
 | Supported shapes | range, ongoing, no-end, year-only | Mixed precision (`2019 - Sep. 2023`) is explicitly excluded |
-| `readMoreUrl` | Strict dropdown | Makes the `askhb.no/...` mistake unreachable |
+| `readMoreUrl` | Several labelled links; page picker plus free text | Superseded the original strict-dropdown decision — see the amendment at the end |
 | Preview placement | Side-by-side, sticky | Editing is desktop-only, so a wide modal costs nothing |
 | Delivery | Four sequential PRs | Repo convention is short-lived branches merged via PR |
 
@@ -209,8 +209,32 @@ No claim of working behaviour is made until the build has been run and the dialo
 
 ## Out of scope
 
-- Any change to the askhb.no repo.
+- ~~Any change to the askhb.no repo.~~ Superseded: rendering multiple links requires one, see the amendment.
 - Date-based sorting of entries; ordering stays manual via `DraggableList`.
 - Mixed-precision date ranges.
 - Making Save transactional. Reporting which PUT failed is in scope; fixing the underlying three-writes-no-rollback design is not.
 - Runtime validation of R2 JSON in either app.
+
+
+---
+
+## Amendment — multiple links per experience
+
+Added after the original design was implemented and reviewed.
+
+**What changed.** The strict dropdown was the wrong call. It made an external `readMoreUrl` impossible — not another site, not a note published between Quartz builds — and it assumed one link per entry. Both were raised as risks when the decision was made; both turned out to matter.
+
+An experience now carries `links: { label, url }[]`. Each row picks a published Quartz page *or* takes any URL typed in, and has its own label so several can render side by side.
+
+**Why additive rather than replacing `readMoreUrl`.** askhb.no renders exactly one link, so unlike `dateRange` — which that app ignores entirely — multiple links require a change there too. Keeping `readMoreUrl` and deriving it from the first link removes the deploy-ordering hazard in both directions:
+
+- admin deploys first → it writes `links` *and* `readMoreUrl`; askhb.no ignores `links` and shows the first link, exactly as today.
+- askhb.no deploys first → it renders `links` when present and falls back to `readMoreUrl`; nothing in the bucket has `links` yet, so nothing changes.
+
+Neither order can break the live site. That is the same reasoning as the date model, and `readMoreUrl` is derived on save for the same reason `date` is — two fields that must agree should never both be editable.
+
+**What this simplified.** The strict select needed a `⚠ Not found` state for URLs absent from the index, and an explicit loading state so a valid URL was not labelled unpublished while the fetch was in flight. Once arbitrary URLs are legal, both disappear: a URL the index does not know is simply a custom one, which is a true statement in every load state.
+
+**Migration.** An entry with a lone `readMoreUrl` gains `[{ label: 'Read more', url }]` on load. An entry with neither is left untouched rather than gaining an empty array. This is counted in the same migration notice as the date changes.
+
+**askhb.no's side.** `ExperienceItem` renders `links` when present and falls back to `readMoreUrl`, each as `{label} →` with the existing styling. `rel="noreferrer"` was added, since these links can now point anywhere.

@@ -1372,3 +1372,5 @@ The plan above is kept as written. These are the points where execution departed
 **Task 4 — no backdrop handler.** The step called for one, but neither dialog's overlay has an `onClick` and nothing listens for Escape, so there is no dismissal path to guard.
 
 **Delivery — branches are stacked, not each cut from `main`.** Task 2 needs Task 1's dialog structure and Task 3 needs its identity fix, and nothing is being merged without review, so each branch is based on its predecessor and each PR targets the previous one.
+
+**Task 3 — superseded by multiple links.** The strict select this task specified was replaced before merge by a `links[]` editor allowing both published pages and arbitrary URLs, and askhb.no gained a companion change to render them. See the amendment at the end of the spec. The `pagesLoading` state added during review was removed with it — it existed to stop a valid URL being labelled "not found" while the index loaded, and that state no longer exists.
