@@ -35,6 +35,8 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 `dateRange` is the one deliberate exception. The editor writes `{ start, end?, ongoing? }` alongside `date` and treats it as the source of truth, recomputing `date` from it on every change — the `date` string is never edited by hand. askhb.no's `props.ts` does **not** declare it and never reads it: that app casts the fetched JSON and ignores unknown keys, so the field is inert there. The two type files therefore differ on purpose. Don't "fix" the divergence by adding `dateRange` to askhb.no unless that app starts rendering from it.
 
+Because `dateRange` wins, hand-editing `date` in the R2 dashboard does nothing — the next load recomputes the string from the structured value and silently reverts the edit, with no "Unsaved changes" cue, since the dirty snapshot is taken after normalisation. Edit the entry in admin.askhb.no instead. A `dateRange` that is malformed (month outside 1-12, mismatched precision) is ignored and the `date` string is reparsed instead, so a bad hand-edit degrades rather than corrupting.
+
 ### The CV upload writes a binary through the same worker
 
 `CvSection` PUTs the chosen PDF to `worker.askhb.no/cv.pdf` and then sets `personalInfo.cvUrl`, which is what makes the portfolio render its Download CV button.

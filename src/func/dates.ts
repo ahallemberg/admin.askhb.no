@@ -101,11 +101,39 @@ function yearOptions(): number[] {
   return years;
 }
 
+function isValidParts(parts: DateParts | undefined): boolean {
+  if (!parts) return false;
+  if (!Number.isInteger(parts.year) || parts.year < 1000 || parts.year > 9999) return false;
+  if (parts.month === undefined) return true;
+  return Number.isInteger(parts.month) && parts.month >= 1 && parts.month <= 12;
+}
+
+// Nothing validates the JSON coming out of R2, and dateRange is trusted ahead of the
+// date string — so an out-of-range month reaching formatDateRange would render as
+// "undefined 2020" and the first Save would persist that over a perfectly good date.
+// Checking it here makes normaliseDate self-healing: a malformed dateRange is ignored
+// and the date string is reparsed instead.
+function isValidRange(range: DateRange): boolean {
+  if (!isValidParts(range.start)) return false;
+  if (!range.end) return true;
+  if (!isValidParts(range.end)) return false;
+  // Mixed precision is unsupported, so a stored range claiming it is malformed.
+  return (range.start.month === undefined) === (range.end.month === undefined);
+}
+
+// True when the range runs backwards. Surfaced as a warning rather than rejected —
+// it is a typo, not corruption, and the stored value stays readable either way.
+function isBackwards(range: DateRange): boolean {
+  if (!range.end) return false;
+  return (range.end.year * 12 + (range.end.month ?? 1)) < (range.start.year * 12 + (range.start.month ?? 1));
+}
+
 // Fills in dateRange and rewrites date into the canonical format. An entry whose
 // date cannot be parsed is returned untouched, so a parser gap can never destroy
 // a date that was already there.
 function normaliseDate<T extends { date: string; dateRange?: DateRange }>(item: T): T {
-  const range = item.dateRange ?? parseDateString(item.date);
+  const stored = item.dateRange;
+  const range = stored && isValidRange(stored) ? stored : parseDateString(item.date);
   if (!range) return item;
   return { ...item, dateRange: range, date: formatDateRange(range) };
 }
@@ -123,14 +151,17 @@ interface PickerState {
   yearOnly: boolean;
 }
 
-const EMPTY_PICKER_STATE: PickerState = {
+// Handed out directly by pickerStateFromRange, so frozen: `update` builds a fresh
+// object today, but one Object.assign(state, patch) away this would corrupt every
+// picker in the session.
+const EMPTY_PICKER_STATE: PickerState = Object.freeze({
   startYear: '',
   startMonth: '',
   endYear: '',
   endMonth: '',
-  endMode: 'date',
+  endMode: 'date' as const,
   yearOnly: false
-};
+});
 
 function pickerStateFromRange(range: DateRange | undefined): PickerState {
   if (!range) return EMPTY_PICKER_STATE;
@@ -177,6 +208,7 @@ export {
   parseDateString,
   yearOptions,
   normaliseDate,
+  isBackwards,
   pickerStateFromRange,
   rangeFromPickerState
 };
