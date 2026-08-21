@@ -12,6 +12,7 @@ import { fetchFromR2 } from '../func/data';
 import { normaliseDate } from '../func/dates';
 import { normaliseLinks } from '../func/links';
 import { fetchPublishedPages, type PublishedPage } from '../func/pages';
+import { deepEqual } from '../func/compare';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
 
@@ -42,6 +43,10 @@ const PortfolioEditor: React.FC = () => {
     // pages.askhb.no outage must never be able to block saving the portfolio.
     const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
     const [pagesLoadFailed, setPagesLoadFailed] = useState(false);
+
+    // What is known to be in R2: set after a successful load and after a fully
+    // successful save. Anything else on screen means unsaved changes.
+    const [savedSnapshot, setSavedSnapshot] = useState<PortfolioData | null>(null);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -67,11 +72,16 @@ const PortfolioEditor: React.FC = () => {
                 
                 // Backfill dateRange and canonicalise the date string for every entry.
                 // An entry whose date cannot be parsed comes back untouched.
-                setPortfolio({
+                const loaded: PortfolioData = {
                     personalInfo,
                     experiences: experiences.map(item => normaliseLinks(normaliseDate(item))),
                     education: education.map(normaliseDate)
-                });
+                };
+
+                // Snapshot the normalised form, not the raw fetch: otherwise the editor
+                // would report unsaved changes the instant it finished loading.
+                setSavedSnapshot(loaded);
+                setPortfolio(loaded);
                 
             } catch (error) {
                 console.error('Error loading portfolio data:', error);
@@ -147,6 +157,15 @@ const PortfolioEditor: React.FC = () => {
         }));
     };
     
+    const isDirty = savedSnapshot !== null && !deepEqual(portfolio, savedSnapshot);
+
+    useEffect(() => {
+        if (!isDirty) return;
+        const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [isDirty]);
+
     const savePortfolio = async () => {
         // Never write the empty initial state over the bucket. Without this the
         // editor would PUT blank strings and empty arrays over every entry if it
@@ -181,15 +200,20 @@ const PortfolioEditor: React.FC = () => {
             ];
             
             const responses = await Promise.all(saveRequests);
-            
-            const failedRequests = responses.filter(response => !response.ok);
-            
-            if (failedRequests.length === 0) {
+
+            const names = ['personalinfo.json', 'experiences.json', 'education.json'];
+            const failed = names.filter((_, index) => !responses[index].ok);
+
+            if (failed.length === 0) {
+                // Only now does the on-screen state match what is in R2.
+                setSavedSnapshot(portfolio);
                 alert('Portfolio saved successfully!');
                 console.log('All files saved successfully');
             } else {
-                alert(`Failed to save ${failedRequests.length} file(s). Check console for details.`);
-                console.error('Some saves failed:', failedRequests);
+                // The three PUTs are independent with no rollback, so a partial failure
+                // leaves R2 in a mixed state. Name the files so it is recoverable.
+                alert(`Failed to save: ${failed.join(', ')}. R2 is now in a mixed state — fix the problem and save again.`);
+                console.error('Some saves failed:', failed, responses);
             }
         } catch (error) {
             alert('Failed to save portfolio. Please check your connection.');
@@ -205,7 +229,11 @@ const PortfolioEditor: React.FC = () => {
                 <header className="py-8 text-center">
                     <div className="flex justify-between items-center">
                         <h1 className="text-3xl font-bold">Portfolio Editor</h1>
-                        <button
+                        <div className="flex items-center gap-4">
+                            {isDirty && (
+                                <span className="text-sm text-amber-700">Unsaved changes</span>
+                            )}
+                            <button
                             onClick={savePortfolio}
                             disabled={isLoading || !!loadError}
                             title={
@@ -217,7 +245,8 @@ const PortfolioEditor: React.FC = () => {
                         >
                             <Save className="w-5 h-5" />
                             Save Portfolio
-                        </button>
+                            </button>
+                        </div>
                     </div>
                 </header>
 
