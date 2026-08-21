@@ -10,6 +10,7 @@ import DraggableList from '../components/DraggableList';
 import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem } from '../types/props';
 import { fetchFromR2 } from '../func/data';
 import { normaliseDate } from '../func/dates';
+import { normaliseLinks } from '../func/links';
 import { fetchPublishedPages, type PublishedPage } from '../func/pages';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH } from '../constants/app';
 
@@ -41,10 +42,6 @@ const PortfolioEditor: React.FC = () => {
     // pages.askhb.no outage must never be able to block saving the portfolio.
     const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([]);
     const [pagesLoadFailed, setPagesLoadFailed] = useState(false);
-    // Tracked explicitly rather than inferred from an empty list: "not loaded yet" and
-    // "not in the index" must not look alike, or a stored URL is labelled unpublished
-    // while the fetch is still in flight and the obvious fix is to clear it.
-    const [pagesLoading, setPagesLoading] = useState(true);
     
     const [experienceDialog, setExperienceDialog] = useState<{
         isOpen: boolean;
@@ -72,7 +69,7 @@ const PortfolioEditor: React.FC = () => {
                 // An entry whose date cannot be parsed comes back untouched.
                 setPortfolio({
                     personalInfo,
-                    experiences: experiences.map(normaliseDate),
+                    experiences: experiences.map(item => normaliseLinks(normaliseDate(item))),
                     education: education.map(normaliseDate)
                 });
                 
@@ -92,8 +89,7 @@ const PortfolioEditor: React.FC = () => {
             .catch(error => {
                 console.error('Error loading published pages:', error);
                 setPagesLoadFailed(true);
-            })
-            .finally(() => setPagesLoading(false));
+            });
     }, []);
     
     const handlePersonalInfoChange = (field: keyof PersonalInfo, value: string) => {
@@ -325,7 +321,6 @@ const PortfolioEditor: React.FC = () => {
                             isEditing={experienceDialog.editIndex !== undefined}
                             publishedPages={publishedPages}
                             pagesLoadFailed={pagesLoadFailed}
-                            pagesLoading={pagesLoading}
                             onClose={() => setExperienceDialog({ isOpen: false })}
                             onSave={handleSaveExperience}
                         />
