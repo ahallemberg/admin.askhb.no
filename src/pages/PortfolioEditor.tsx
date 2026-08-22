@@ -415,6 +415,12 @@ const PortfolioEditor: React.FC = () => {
                 {!isLoading && !loadError && (
                     <>
                         <main className="container mx-auto py-8 max-w-6xl">
+                            {/* CV Section */}
+                            <CvSection
+                                personalInfo={portfolio.personalInfo}
+                                onUpdate={handlePersonalInfoChange}
+                            />
+
                             {/* Personal Info Section */}
                             <section className="mb-8">
                                 <div className="flex justify-between items-center mb-4">
@@ -426,12 +432,6 @@ const PortfolioEditor: React.FC = () => {
                                     onEdit={() => setPersonalInfoDialog(true)}
                                 />
                             </section>
-
-                            {/* CV Section */}
-                            <CvSection
-                                personalInfo={portfolio.personalInfo}
-                                onUpdate={handlePersonalInfoChange}
-                            />
                             
                             {/* Experience Section */}
                             <section className="mb-8">
