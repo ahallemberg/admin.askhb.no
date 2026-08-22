@@ -1,1 +1,57 @@
 @import "tailwindcss";
+
+/*
+ * askhb.no's palette, carried here so the editor's preview panes can render an
+ * entry the way the site actually renders it. Copied from that repo's
+ * src/index.css -- the two must agree, and a drifting value shows up as a
+ * preview that quietly stops matching the page.
+ *
+ * Scoped by naming, not by nesting: the tokens below generate utilities the
+ * admin chrome never asks for, so adding them restyles nothing that already
+ * exists here. The one deliberate override is the serif family, which this app
+ * has no other use for and which the mirrored markup names directly.
+ *
+ * `static` is load-bearing, for the same reason it is over there: without it
+ * Tailwind emits only the theme variables it sees used, so an unreferenced light
+ * value would be dropped from the root while the dark block below kept its
+ * counterpart -- a token that resolves in one theme and is undefined in the
+ * other. `inline` would be worse still: it bakes the literal hex into every
+ * utility and leaves the dark block with nothing to override.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme static {
+    --font-serif: "Newsreader Variable", Georgia, serif;
+    /*
+     * Deliberately not a redefinition of Tailwind's sans family. That one is
+     * what the admin chrome renders in, and pointing it at the site's face
+     * would restyle every panel in the app to match -- a change nobody asked
+     * for. The preview surface names this token instead, and everything inside
+     * it inherits.
+     */
+    --font-preview: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+    --color-paper: #fcfbf8;
+    --color-ink: #1c1b19;
+    --color-ink-muted: #4a463f;
+    --color-ink-faint: #787266;
+    --color-accent: #8a2f2f;
+    --color-rule: #e2dccf;
+    --color-rule-faint: #eeeae0;
+}
+
+/*
+ * The site puts this class on the document element; here it goes on the preview
+ * surface alone, so the editor around it stays light whichever theme the
+ * preview is showing. Custom properties cascade, so every mirrored component
+ * inside picks the dark values up without knowing the toggle exists.
+ */
+.dark {
+    --color-paper: #16150f;
+    --color-ink: #f0ece0;
+    --color-ink-muted: #b8b2a1;
+    --color-ink-faint: #8a8272;
+    --color-accent: #d98a72;
+    --color-rule: #2e2c22;
+    --color-rule-faint: #252319;
+}

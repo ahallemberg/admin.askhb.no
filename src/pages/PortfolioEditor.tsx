@@ -6,7 +6,8 @@ import OrganisationCard from '../components/OrganisationCard';
 import OrganisationDialog from '../components/OrganisationDialog';
 import ProjectCard from '../components/ProjectCard';
 import ProjectDialog from '../components/ProjectDialog';
-import PersonalInfoSection from '../components/PersonalInfoSection';
+import PersonalInfoCard from '../components/PersonalInfoCard';
+import PersonalInfoDialog from '../components/PersonalInfoDialog';
 import CvSection from '../components/CvSection';
 import DraggableList from '../components/DraggableList';
 import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem, Organisation, ProjectItem } from '../types/props';
@@ -100,6 +101,9 @@ const PortfolioEditor: React.FC = () => {
         isOpen: boolean;
         editIndex?: number;
     }>({ isOpen: false });
+
+    // No editIndex: there is one personal info object, so this is open or shut.
+    const [personalInfoDialog, setPersonalInfoDialog] = useState(false);
     
     useEffect(() => {
         const loadPortfolioData = async () => {
@@ -184,6 +188,15 @@ const PortfolioEditor: React.FC = () => {
         setPortfolio(prev => ({
             ...prev,
             personalInfo: { ...prev.personalInfo, [field]: value }
+        }));
+    };
+
+    // Merged over whatever the object currently holds rather than replacing it,
+    // so cvUrl -- which this dialog does not edit -- survives the save.
+    const handleSavePersonalInfo = (fields: Pick<PersonalInfo, 'name' | 'title' | 'about'>) => {
+        setPortfolio(prev => ({
+            ...prev,
+            personalInfo: { ...prev.personalInfo, ...fields }
         }));
     };
     
@@ -403,10 +416,16 @@ const PortfolioEditor: React.FC = () => {
                     <>
                         <main className="container mx-auto py-8 max-w-6xl">
                             {/* Personal Info Section */}
-                            <PersonalInfoSection
-                                personalInfo={portfolio.personalInfo}
-                                onUpdate={handlePersonalInfoChange}
-                            />
+                            <section className="mb-8">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-2xl font-bold">Personal Information</h2>
+                                </div>
+
+                                <PersonalInfoCard
+                                    personalInfo={portfolio.personalInfo}
+                                    onEdit={() => setPersonalInfoDialog(true)}
+                                />
+                            </section>
 
                             {/* CV Section */}
                             <CvSection
@@ -497,6 +516,16 @@ const PortfolioEditor: React.FC = () => {
                         </main>
 
                         {/* Dialogs */}
+                        <PersonalInfoDialog
+                            // Remounts on every open so the draft starts from what is
+                            // stored, the same reason the other three carry a key.
+                            key={`personal-info-${personalInfoDialog}`}
+                            personalInfo={portfolio.personalInfo}
+                            isOpen={personalInfoDialog}
+                            onClose={() => setPersonalInfoDialog(false)}
+                            onSave={handleSavePersonalInfo}
+                        />
+
                         <OrganisationDialog
                             // Remounts on every open so the draft starts clean; see
                             // BLANK_ORGANISATION above. Doubly required here: the dialog
