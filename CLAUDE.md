@@ -69,11 +69,17 @@ The name therefore has to exist before a file can be chosen; the upload control 
 
 ### Every editor is fields on one side, a live preview of askhb.no on the other
 
-`EditorDialog` is the shell all three entry dialogs render into: full-viewport,
-title bar and Save/Cancel pinned, fields on the left and a preview on the right
-above the large breakpoint, stacked into one scroller below it. `PersonalInfoSection`
-uses the same two-column arrangement inline, without the shell — it edits the
-portfolio state directly rather than holding a draft.
+`EditorDialog` is the shell every dialog renders into: full-viewport, title bar
+and Save/Cancel pinned, fields on the left and a preview on the right above the
+large breakpoint, stacked into one scroller below it.
+
+All four sections work the same way — a card per entry with an Edit button, and a
+dialog holding a draft that only reaches the portfolio state on Save. Personal
+information is a section like the others, not a form on the landing page:
+`PersonalInfoCard` summarises it, `PersonalInfoDialog` edits it. That dialog owns
+only `name`, `title` and `about`, and Save merges those three over the stored
+object rather than replacing it, so it can never write back a stale `cvUrl` —
+that field belongs to `CvSection`.
 
 **The components under `src/components/preview/` are hand-copies of askhb.no's
 rendering, and nothing keeps them in step.** `OrganisationPreview` +
