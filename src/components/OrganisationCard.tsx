@@ -1,5 +1,12 @@
-import type { Organisation, DragHandleProps } from "../types/props";
+import type { Organisation, DragHandleProps, Role } from "../types/props";
+import { normaliseLinks } from "../func/links";
 import { Edit, Trash2, GripVertical } from "lucide-react";
+
+// A role carries either shape: `links` since multi-link support, or a lone
+// `readMoreUrl` from before it. normaliseLinks backfills one from the other and
+// drops empty urls, so the markup below has a single path and can never emit an
+// anchor without a href or a label.
+const roleLinks = (role: Role) => normaliseLinks(role).links ?? [];
 
 const OrganisationCard: React.FC<{
     organisation: Organisation;
@@ -37,22 +44,42 @@ const OrganisationCard: React.FC<{
             </p>
 
             <ol className="mt-3 border-l-2 border-gray-200 pl-4">
-                {organisation.roles.map((role, index) => (
-                    <li key={index} className={index > 0 ? "mt-3" : undefined}>
-                        <p className="font-semibold">{role.title}</p>
-                        <p className="text-sm text-gray-500">{role.date}</p>
-                        {role.result && (
-                            <p className="text-sm text-gray-700 mt-1">Result: {role.result}</p>
-                        )}
-                        <div className="mt-1">
-                            {role.skills.map((skill: string, skillIndex: number) => (
-                                <span key={skillIndex} className="inline-block bg-gray-200 rounded-full px-3 py-1 text-xs font-semibold text-gray-700 mr-2 mb-2">
-                                    {skill}
-                                </span>
-                            ))}
-                        </div>
-                    </li>
-                ))}
+                {organisation.roles.map((role, index) => {
+                    const links = roleLinks(role);
+
+                    return (
+                        <li key={index} className={index > 0 ? "mt-3" : undefined}>
+                            <h4 className="font-semibold">{role.title}</h4>
+                            <p className="text-sm text-gray-500">{role.date}</p>
+                            {role.result && (
+                                <p className="text-sm text-gray-700 mt-1">Result: {role.result}</p>
+                            )}
+                            {links.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-x-4">
+                                    {links.map((link, linkIndex) => (
+                                        <a
+                                            key={linkIndex}
+                                            href={link.url}
+                                            target="_blank"
+                                            // These can point anywhere now, not only at pages.askhb.no.
+                                            rel="noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 text-sm transition-colors"
+                                        >
+                                            {link.label} →
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="mt-1">
+                                {role.skills.map((skill: string, skillIndex: number) => (
+                                    <span key={skillIndex} className="inline-block bg-gray-200 rounded-full px-3 py-1 text-xs font-semibold text-gray-700 mr-2 mb-2">
+                                        {skill}
+                                    </span>
+                                ))}
+                            </div>
+                        </li>
+                    );
+                })}
             </ol>
         </div>
     </div>
