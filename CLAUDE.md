@@ -67,11 +67,75 @@ The name therefore has to exist before a file can be chosen; the upload control 
 
 **Renaming an entry does not re-key its image, and that is accepted.** The stored URL keeps pointing at the old key and keeps working — the object is untouched. The cost is that a re-upload after a rename writes to the new prefix and orphans the old object in a bucket the worker cannot delete from. What it cannot do is overwrite another entry's asset, which is the failure the scheme exists to prevent, and re-keying is not available anyway: the worker has neither COPY nor DELETE.
 
+### Every editor is fields on one side, a live preview of askhb.no on the other
+
+`EditorDialog` is the shell all three entry dialogs render into: full-viewport,
+title bar and Save/Cancel pinned, fields on the left and a preview on the right
+above the large breakpoint, stacked into one scroller below it. `PersonalInfoSection`
+uses the same two-column arrangement inline, without the shell — it edits the
+portfolio state directly rather than holding a draft.
+
+**The components under `src/components/preview/` are hand-copies of askhb.no's
+rendering, and nothing keeps them in step.** `OrganisationPreview` +
+`RolePreview` mirror `OrganisationItem` + `RoleBlock`, `ProjectPreview` mirrors
+`ProjectItem`, `EducationPreview` mirrors `EducationItem`, `PersonalInfoPreview`
+mirrors the header and About section of `Portfolio.tsx`, and `LogoMark` /
+`QFreeMark` are transferred whole. Restyling any of those on the site makes the
+matching file here silently wrong — and a preview that no longer matches is
+worse than no preview, because it is confidently wrong. This has already
+happened once: the previews written before the editorial redesign went on
+showing the old sans-serif card for as long as they survived.
+
+Sharing the components instead would mean a package or a submodule across two
+separately deployed repos, which is not worth it at this size. The mirror is the
+accepted cost; changing both together is the discipline that pays it.
+
+Three deliberate departures from the site, all for the same reason — this is an
+editor holding an unsaved draft:
+
+- Links and project cards render as text, not anchors. A stray click that
+  navigates away loses the draft, and the url is in the field beside the pane.
+- Blank required fields preview as an italic placeholder rather than an empty
+  heading, so a half-filled draft reads as unfinished rather than broken.
+- `EducationPreview` drops the hairline the site draws between entries. It
+  separates one entry from the next, and a previewed entry is always the last.
+
+The personal info preview leaves out the row of social icons. Those live in a
+JSON file committed to askhb.no's own repo rather than in R2, so nothing here
+can read them, and duplicating the list would add a fourth place to edit to a
+change that already needs three.
+
+### The site's palette lives here too
+
+`src/index.css` carries askhb.no's tokens — paper, ink, accent, rules, and the
+serif family — so the preview panes can paint the real thing. Copied from that
+repo's `src/index.css`; the two must agree.
+
+Two things about it are load-bearing. The theme block is keyed on a class that
+goes on the preview surface rather than on the document, so the editor chrome
+around a dark preview stays light. And the sans family is deliberately *not*
+redefined: that one is what the admin chrome renders in, and pointing it at the
+site's face would restyle every panel in the app. The preview surface names its
+own font token instead.
+
+`usePreviewTheme` remembers the light/dark choice in `localStorage`, because it
+is a property of how the author works rather than of the entry being edited.
+
 ### readMoreUrl points at the Quartz site
 
 `ExperienceItem.readMoreUrl` drives the "Read more →" link on the portfolio. Long-form write-ups are **not** pages on askhb.no; they are markdown notes in the `obsidian-content` repo, published by Quartz at `pages.askhb.no/<Filename>` (capitals matter). So the correct value looks like `https://pages.askhb.no/Netlight`. A URL under `askhb.no/...` will silently land on the portfolio home page, because askhb.no is an SPA that redirects unknown paths to `/`.
 
 ## Gotchas
+
+**Tailwind 4 scans comments, so a class name written in one is compiled into the
+bundle.** This started applying here the moment the site's tokens arrived:
+naming a utility to explain it ships a dead rule, and an arbitrary variant
+spelled in prose ships a rule with an invalid declaration in it. Describe classes
+in prose rather than spelling them, and check the emitted CSS if unsure. The
+reverse also bites — some utility names are ordinary English, so writing about a
+greyscale filter or an inverted mark emits those utilities. That is a few hundred
+harmless bytes; suppressing them would break any genuine future use of the same
+name, so leave it.
 
 **`.env` holds `VITE_WORKER_SHARED_SECRET`.** It is gitignored (`.gitignore:26`) and untracked — keep it that way, and don't commit the value in any other form (an `.env.example`, a README snippet, a test fixture).
 
@@ -87,7 +151,7 @@ This is the same hazard that keeps `fetchFromR2OrDefault`'s fallback narrowed to
 
 Components are `const X: React.FC<Props>` with default exports, one per file. Indentation is 4 spaces in `src/components/` and `src/pages/`, 2 spaces in `src/func/` and `src/types/` — match the file you're editing.
 
-Unlike the askhb.no repo, this app has no router and no React Query: `App.tsx` renders `PortfolioEditor` directly, and data loading is a plain `useEffect` with `Promise.all`. Tailwind 4 is wired through the Vite plugin; `tailwind.config.js` is a leftover v3-style stub and is not the place to configure anything. There is no dark mode here.
+Unlike the askhb.no repo, this app has no router and no React Query: `App.tsx` renders `PortfolioEditor` directly, and data loading is a plain `useEffect` with `Promise.all`. Tailwind 4 is wired through the Vite plugin; `tailwind.config.js` is a leftover v3-style stub and is not the place to configure anything. The admin chrome itself has no dark mode — the only thing that renders dark is a preview surface the author has switched, and it is scoped to that surface rather than to the document.
 
 ## Git
 
