@@ -3,18 +3,28 @@ import type { PersonalInfo } from "../types/props";
 import EditorDialog from "./EditorDialog";
 import PersonalInfoPreview from "./preview/PersonalInfoPreview";
 import PreviewSurface from "./preview/PreviewSurface";
+import ProfilePictureField from "./ProfilePictureField";
 import { deepEqual } from "../func/compare";
 
 const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
 
 /*
- * The three fields this dialog owns. cvUrl is deliberately not among them: it is
- * set by CvSection, and a dialog that held a whole snapshot of the personal info
+ * The fields this dialog owns. cvUrl is deliberately not among them: it is set
+ * by CvSection, and a dialog that held a whole snapshot of the personal info
  * object would write its own copy of that field back on save. Saving merges
- * these three over whatever the object currently holds instead, so this dialog
- * can never be the thing that clears a CV link.
+ * these over whatever the object currently holds instead, so this dialog can
+ * never be the thing that clears a CV link.
  */
-type EditableFields = Pick<PersonalInfo, 'name' | 'title' | 'about'>;
+type EditableFields = Pick<PersonalInfo, 'name' | 'title' | 'about' | 'profilePictureUrl'>;
+
+// Both the draft's starting point and what Cancel compares it against, written
+// once so the two cannot drift apart as fields are added.
+const editableFieldsOf = (info: PersonalInfo): EditableFields => ({
+    name: info.name,
+    title: info.title,
+    about: info.about,
+    profilePictureUrl: info.profilePictureUrl
+});
 
 const PersonalInfoDialog: React.FC<{
     personalInfo: PersonalInfo;
@@ -22,24 +32,30 @@ const PersonalInfoDialog: React.FC<{
     onClose: () => void;
     onSave: (fields: EditableFields) => void;
 }> = ({ personalInfo, isOpen, onClose, onSave }) => {
-    const [draft, setDraft] = useState<EditableFields>({
-        name: personalInfo.name,
-        title: personalInfo.title,
-        about: personalInfo.about
-    });
+    const [draft, setDraft] = useState<EditableFields>(editableFieldsOf(personalInfo));
 
     const update = (patch: Partial<EditableFields>) => setDraft(prev => ({ ...prev, ...patch }));
 
     // Closing discards the draft outright, so confirm first when there is one.
     const handleClose = () => {
-        const stored: EditableFields = {
-            name: personalInfo.name,
-            title: personalInfo.title,
-            about: personalInfo.about
-        };
-        if (!deepEqual(draft, stored) && !window.confirm('Discard changes to your personal information?')) {
+        if (deepEqual(draft, editableFieldsOf(personalInfo))) {
+            onClose();
             return;
         }
+
+        /*
+         * A replacement photo is in the bucket already -- the upload happens when
+         * the file is chosen, not on save -- so discarding cannot bring the old
+         * one back. All it decides is whether the site links the new URL now or
+         * picks the photo up whenever its image cache expires. Said out loud
+         * because "discard" is otherwise read as "undo".
+         */
+        const photoReplaced = draft.profilePictureUrl !== personalInfo.profilePictureUrl;
+        const message = photoReplaced
+            ? 'Discard changes? The new photo is already in the bucket, so this will not bring the old one back — it only leaves the site linking the previous URL.'
+            : 'Discard changes to your personal information?';
+
+        if (!window.confirm(message)) return;
         onClose();
     };
 
@@ -55,7 +71,7 @@ const PersonalInfoDialog: React.FC<{
                 onClose();
             }}
             preview={
-                <PreviewSurface note="The profile photo comes from the bucket and the social icons from the site's own repo; neither is edited here, and the icon row is left out.">
+                <PreviewSurface note="The row of social icons is left out: those come from the site's own repo rather than the bucket, so nothing here can read or edit them.">
                     {/* The draft over the stored object, so the CV button previews
                         from the real cvUrl while the three fields track what is
                         being typed. */}
@@ -64,6 +80,12 @@ const PersonalInfoDialog: React.FC<{
             }
         >
             <div className="space-y-4">
+                {/* First, because it is the first thing on the page it previews. */}
+                <ProfilePictureField
+                    value={draft.profilePictureUrl}
+                    onChange={(profilePictureUrl) => update({ profilePictureUrl })}
+                />
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
                     <input

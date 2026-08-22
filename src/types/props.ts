@@ -3,6 +3,11 @@ interface PersonalInfo {
   title: string;
   about: string;
   cvUrl?: string;
+  // Not what makes the header photo reachable -- every upload overwrites one
+  // fixed key, so the site has a photo with or without this. What it carries is
+  // the cache-busting query a replacement needs to appear before the bucket's
+  // 4 hour max-age expires.
+  profilePictureUrl?: string;
 }
 
 interface DateParts {

@@ -27,7 +27,7 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 - **Reads** go straight to `https://r2.askhb.no` (public, no auth), through `fetchFromR2` in `src/func/data.ts` — or `fetchFromR2OrDefault`, which additionally returns a caller-supplied fallback on 404 so an object that does not exist in the bucket yet can still be edited into existence.
 - **Writes** go to `https://worker.askhb.no`, a Cloudflare Worker with an R2 binding, authenticated with an `X-Custom-API-Key` header.
-- Four JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json`, `/projects.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection` and images under `/logos/` and `/screenshots/` uploaded by `ImageUploadField`.
+- Four JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json`, `/projects.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection`, `/profilepicture.png` uploaded by `ProfilePictureField`, and images under `/logos/` and `/screenshots/` uploaded by `ImageUploadField`.
 
 ### experiences.json holds organisations, not roles
 
@@ -57,6 +57,33 @@ Each upload takes a ticket from a `useRef` counter and only the newest may write
 
 Removing only clears `cvUrl`; the PDF stays in the bucket and remains publicly reachable at its URL. The worker supports no DELETE, so there is no way to take a CV offline from this UI.
 
+### The header photo is a third upload shape: replace-only
+
+`ProfilePictureField` (inside `PersonalInfoDialog`) PUTs to the fixed key
+`worker.askhb.no/profilepicture.png` and sets `personalInfo.profilePictureUrl`.
+It follows `CvSection` — singleton asset, fixed key, ticketed upload, publish on
+pick — with one difference that is easy to get wrong when editing it.
+
+**The field is not what makes the photo reachable, so there is no remove
+button.** askhb.no addresses the same object through a constant and falls back to
+it, so the site has a header photo whether or not the field is set. Clearing it
+would change nothing a reader could see, unlike clearing `cvUrl` (which hides a
+button) or a logo URL (which leaves a company without a mark). What the field
+carries is the `?v=<timestamp>` cache buster — the same reason `cvUrl` carries
+one — so an unset field means "the photo predates the field", not "no photo".
+
+**A replacement is destructive and Save does not gate it.** The key never
+changes, so the PUT overwrites the previous photo the moment a file is chosen,
+and the bucket has no versioning and the worker no DELETE or COPY: the old one is
+gone. Discarding the dialog only decides whether the site links the new URL now
+or picks the change up when the 4 hour image cache expires. The dialog's discard
+prompt says so when a photo was replaced; keep that wording honest if the flow
+changes.
+
+The key stays `profilepicture.png` whatever the file is named or encoded as. The
+extension is a name, not a declaration — the worker stores the request's
+`Content-Type` on the object, so a JPEG uploaded to that key is served as a JPEG.
+
 ### Image uploads are keyed by the owning entry, and publish on pick
 
 `ImageUploadField` (organisation logos, project screenshots) PUTs the chosen file the moment it is picked, exactly like `CvSection` — **the upload is itself a publish**, and Cancel in the dialog cannot undo it. Cancel discards the URL, not the object.
@@ -77,9 +104,11 @@ All four sections work the same way — a card per entry with an Edit button, an
 dialog holding a draft that only reaches the portfolio state on Save. Personal
 information is a section like the others, not a form on the landing page:
 `PersonalInfoCard` summarises it, `PersonalInfoDialog` edits it. That dialog owns
-only `name`, `title` and `about`, and Save merges those three over the stored
-object rather than replacing it, so it can never write back a stale `cvUrl` —
-that field belongs to `CvSection`.
+`name`, `title`, `about` and `profilePictureUrl`, and Save merges those over the
+stored object rather than replacing it, so it can never write back a stale
+`cvUrl` — that field belongs to `CvSection`. `editableFieldsOf` builds both the
+draft's starting point and the snapshot Cancel compares against, so adding a
+field to one cannot leave the other behind and silently stop prompting.
 
 **The components under `src/components/preview/` are hand-copies of askhb.no's
 rendering, and nothing keeps them in step.** `OrganisationPreview` +
