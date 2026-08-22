@@ -126,9 +126,13 @@ const PortfolioEditor: React.FC = () => {
                 // logoScale and commitment, and collapse every multi-role organisation
                 // to one role. The file is written wholesale, so it is one shape or the
                 // other and testing the first element is enough.
-                const organisations: Organisation[] = isOrganisationArray(rawExperiences)
+                const alreadyGrouped = isOrganisationArray(rawExperiences);
+                // Empty when the file is already grouped, so the count below can read
+                // off it directly rather than asking the guard a second time.
+                const legacyExperiences = alreadyGrouped ? [] : rawExperiences as ExperienceItem[];
+                const organisations: Organisation[] = alreadyGrouped
                     ? rawExperiences
-                    : groupExperiences(rawExperiences as ExperienceItem[]);
+                    : groupExperiences(legacyExperiences);
 
                 // Backfill dateRange and canonicalise the date string for every entry.
                 // An entry whose date cannot be parsed comes back untouched.
@@ -147,7 +151,7 @@ const PortfolioEditor: React.FC = () => {
                 // normaliseLinks internally, so a regrouping save subsumes both.
                 const reformatted = education.filter((item, i) => item.date !== loaded.education[i].date).length;
                 const structured = education.filter((item, i) => !item.dateRange && !!loaded.education[i].dateRange).length;
-                const regrouped = isOrganisationArray(rawExperiences) ? 0 : (rawExperiences as ExperienceItem[]).length;
+                const regrouped = legacyExperiences.length;
                 setMigration(reformatted > 0 || structured > 0 || regrouped > 0
                     ? { reformatted, structured, regrouped }
                     : null);
@@ -301,7 +305,7 @@ const PortfolioEditor: React.FC = () => {
             ];
 
             // allSettled, not all: fetch rejects on a network-level failure, and
-            // Promise.all would abandon the other two PUTs mid-flight without
+            // Promise.all would abandon the other three PUTs mid-flight without
             // cancelling them. They can still land, so reporting "nothing was saved"
             // from the catch would be the opposite of the truth.
             const results = await Promise.allSettled(targets.map(target => fetch(R2_PUT_ENDPOINT + target.path, {
@@ -325,7 +329,7 @@ const PortfolioEditor: React.FC = () => {
                 alert('Portfolio saved successfully!');
                 console.log('All files saved successfully');
             } else {
-                // The three PUTs are independent with no rollback, so a partial failure
+                // The four PUTs are independent with no rollback, so a partial failure
                 // leaves R2 in a mixed state. Name the files so it is recoverable.
                 setSaveFailed(true);
                 alert(`Failed to save: ${failed.join(', ')}. R2 is now in a mixed state — fix the problem and save again.`);
