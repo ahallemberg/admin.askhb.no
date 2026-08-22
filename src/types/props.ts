@@ -30,15 +30,21 @@ interface Role {
   // clean headline number leave it unset and the layout closes up.
   result?: string;
   skills: string[];
+  // Derived from links[0] so an askhb.no that predates links keeps working.
   readMoreUrl?: string;
   links?: PortfolioLink[];
 }
 
 interface Organisation {
   company: string;
+  // Joins the date span and commitment in the meta line under the company name. On
+  // migrated entries it comes from the legacy company string, which encoded it as
+  // "Q-Free - Trondheim" (`splitCompany`); an entry whose company carried no such
+  // suffix has none until it is set here.
   location?: string;
-  // Derived from the roles' dateRanges, never hand-edited — same arrangement as
-  // date/dateRange on a single entry.
+  // Derived from the roles' dateRanges, never hand-edited — the same arrangement as
+  // date/dateRange one level down, on `roles[]`. There is no `dateRange` here: the
+  // structured source is each role's, and `spanOf` reduces them to this string.
   date: string;
   logoUrl?: string;
   // Optical normalisation. Marks differ in ink coverage, so equal boxes do not give
