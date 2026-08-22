@@ -27,7 +27,15 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 - **Reads** go straight to `https://r2.askhb.no` (public, no auth), through `fetchFromR2` in `src/func/data.ts` — or `fetchFromR2OrDefault`, which additionally returns a caller-supplied fallback on 404 so an object that does not exist in the bucket yet can still be edited into existence.
 - **Writes** go to `https://worker.askhb.no`, a Cloudflare Worker with an R2 binding, authenticated with an `X-Custom-API-Key` header.
-- Three JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection`.
+- Four JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json`, `/projects.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection` and images under `/logos/` and `/screenshots/` uploaded by `ImageUploadField`.
+
+### experiences.json holds organisations, not roles
+
+Each entry is an employer with a `roles` array, so two stints at one company are one entry with two roles rather than two rows. The organisation's `date` is the span across its roles, derived by `spanOf` and never typed — the same arrangement as `date`/`dateRange` one level down, described below.
+
+`src/func/organisations.ts` migrates the older flat shape on load, and **that migration is one-way — `isOrganisationArray` is what stops it running twice.** `groupExperiences` rebuilds each role from the fields a legacy `ExperienceItem` had, so feeding it already-grouped data would silently drop `result`, `location`, `logoUrl`, `logoScale` and `commitment`, and flatten every multi-role organisation down to its first role. TypeScript blocks the direct call, since `Organisation` has none of `title`/`description`/`skills`; the only way in is a `JSON.parse` cast, which is exactly the path the guard in `PortfolioEditor`'s load covers. Don't weaken it.
+
+Because the file is written wholesale it is one shape or the other, never mixed, so the guard tests only the first element.
 
 ### The JSON shape is a contract across three places
 
