@@ -107,6 +107,8 @@ const ProjectDialog: React.FC<{
                         label="Screenshot (optional)"
                         value={draft.screenshotUrl}
                         dir={SCREENSHOT_DIR}
+                        owner={draft.name}
+                        ownerLabel="project name"
                         onChange={(screenshotUrl) => update({ screenshotUrl })}
                     />
 

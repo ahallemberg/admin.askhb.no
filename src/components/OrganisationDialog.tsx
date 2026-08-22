@@ -191,6 +191,8 @@ const OrganisationDialog: React.FC<{
                             label="Logo (optional)"
                             value={fields.logoUrl}
                             dir={LOGO_DIR}
+                            owner={fields.company}
+                            ownerLabel="company name"
                             onChange={(logoUrl) => setFields(prev => ({ ...prev, logoUrl }))}
                         />
 
