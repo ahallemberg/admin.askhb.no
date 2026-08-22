@@ -1,4 +1,4 @@
-import type { ExperienceItem, Organisation, Role, DateRange } from '../types/props';
+import type { ExperienceItem, Organisation, Role, DateParts, DateRange } from '../types/props';
 import { formatDateRange, normaliseDate } from './dates';
 import { normaliseLinks } from './links';
 
@@ -21,28 +21,46 @@ function splitCompany(raw: string): { company: string; location?: string } {
   return { company, location };
 }
 
-// Earliest start to latest end across the roles. A single ongoing role makes the
-// whole organisation ongoing; an end that is absent without `ongoing` means a
-// point date, which contributes a start but no end.
+// Earliest start to latest end across the roles, chosen so the span contains every
+// role. A single ongoing role makes the whole organisation ongoing, and that wins
+// over any fixed end.
+//
+// An end that is absent without `ongoing` means a point date, not an open one, so
+// such a range contributes its start to *both* pools. Leaving it out of the end pool
+// is how a May 2022 point role ends up inside an organisation rendered as
+// "Jan. 2019 - Mar. 2019".
+//
+// Both pools compare on year*100+month, but the month a year-only date stands in for
+// differs by side, and the asymmetry is deliberate rather than a typo: a year-only
+// start means the earliest point in that year, so it keys as month 0 and sorts ahead
+// of "Mar. 2019"; a year-only end means the latest point in that year, so it keys as
+// month 12 and sorts behind it. Keying ends at 0 lets a month-precision role in the
+// same year cut the span short of a year-only role that outlasts it.
+//
+// Feeding those starts into the end pool is also why an end landing exactly on the
+// start is dropped again: without that, every point-date organisation would render
+// as "May 2022 - May 2022". When the widest end coincides with the earliest start,
+// every role begins and ends on that one date, so the span stays a bare start.
 function spanOf(roles: Role[]): DateRange | undefined {
   const ranges = roles.map(role => role.dateRange).filter((r): r is DateRange => !!r);
   if (ranges.length === 0) {
     return undefined;
   }
 
-  const key = (p: { year: number; month?: number }) => p.year * 100 + (p.month ?? 0);
+  const startKey = (p: DateParts) => p.year * 100 + (p.month ?? 0);
+  const endKey = (p: DateParts) => p.year * 100 + (p.month ?? 12);
 
-  const start = ranges.reduce((min, r) => (key(r.start) < key(min) ? r.start : min), ranges[0].start);
+  const start = ranges.reduce((min, r) => (startKey(r.start) < startKey(min) ? r.start : min), ranges[0].start);
 
   if (ranges.some(r => r.ongoing)) {
     return { start, ongoing: true };
   }
 
-  const ends = ranges.map(r => r.end).filter((e): e is { year: number; month?: number } => !!e);
-  if (ends.length === 0) {
+  const ends = ranges.map(r => r.end ?? r.start);
+  const end = ends.reduce((max, e) => (endKey(e) > endKey(max) ? e : max), ends[0]);
+  if (end.year === start.year && end.month === start.month) {
     return { start };
   }
-  const end = ends.reduce((max, e) => (key(e) > key(max) ? e : max), ends[0]);
   return { start, end };
 }
 
