@@ -193,7 +193,7 @@ const PortfolioEditor: React.FC = () => {
 
     // Merged over whatever the object currently holds rather than replacing it,
     // so cvUrl -- which this dialog does not edit -- survives the save.
-    const handleSavePersonalInfo = (fields: Pick<PersonalInfo, 'name' | 'title' | 'about'>) => {
+    const handleSavePersonalInfo = (fields: Pick<PersonalInfo, 'name' | 'title' | 'about' | 'profilePictureUrl'>) => {
         setPortfolio(prev => ({
             ...prev,
             personalInfo: { ...prev.personalInfo, ...fields }

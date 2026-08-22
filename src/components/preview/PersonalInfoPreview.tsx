@@ -19,8 +19,11 @@ const PersonalInfoPreview: React.FC<{ personalInfo: PersonalInfo }> = ({ persona
     return (
         <div>
             <header className="pb-10 text-center">
+                {/* The draft's URL when a photo has just been uploaded, so this
+                    shows the new one rather than whatever the browser cached for
+                    the bare key. */}
                 <img
-                    src={R2_PROFILE_PICTURE}
+                    src={personalInfo.profilePictureUrl || R2_PROFILE_PICTURE}
                     alt=""
                     className="w-26 h-26 mx-auto mb-5"
                 />
