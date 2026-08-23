@@ -104,6 +104,9 @@ const ProjectDialog: React.FC<{
                         rows={5}
                         className={FIELD_CLASS + " resize-none"}
                     />
+                    <p className="mt-1 text-xs text-ink-faint">
+                        Supports [text](url), **bold** and *italic*.
+                    </p>
                 </div>
 
                 <ImageUploadField
