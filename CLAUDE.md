@@ -27,7 +27,7 @@ PortfolioEditor → PUT worker.askhb.no → R2 bucket ← GET r2.askhb.no ← as
 
 - **Reads** go straight to `https://r2.askhb.no` (public, no auth), through `fetchFromR2` in `src/func/data.ts` — or `fetchFromR2OrDefault`, which additionally returns a caller-supplied fallback on 404 so an object that does not exist in the bucket yet can still be edited into existence.
 - **Writes** go to `https://worker.askhb.no`, a Cloudflare Worker with an R2 binding, authenticated with an `X-Custom-API-Key` header.
-- Four JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json`, `/projects.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection`, `/profilepicture.png` uploaded by `ProfilePictureField`, and images under `/logos/` and `/screenshots/` uploaded by `ImageUploadField`.
+- Four JSON objects: `/personalinfo.json`, `/experiences.json`, `/education.json`, `/projects.json` (`src/constants/app.ts`), plus `/cv.pdf` uploaded by `CvSection`, `/profilepicture.png` uploaded by `ProfilePictureField`, and images under `/logos/` and `/screenshots/` uploaded by `ImageUploadField` or, for a project screenshot, rendered straight into the bucket by `ScreenshotCapture`.
 
 ### experiences.json holds organisations, not roles
 
@@ -93,6 +93,20 @@ That is why the key is `<dir>/<slug>-<fingerprint>/<filename>` rather than the f
 The name therefore has to exist before a file can be chosen; the upload control is disabled until it does, because a blank prefix would put every unnamed entry back on one key.
 
 **Renaming an entry does not re-key its image, and that is accepted.** The stored URL keeps pointing at the old key and keeps working — the object is untouched. The cost is that a re-upload after a rename writes to the new prefix and orphans the old object in a bucket the worker cannot delete from. What it cannot do is overwrite another entry's asset, which is the failure the scheme exists to prevent, and re-keying is not available anyway: the worker has neither COPY nor DELETE.
+
+### A project screenshot can also be rendered rather than uploaded
+
+`ScreenshotCapture` (inside `ProjectDialog`, beside the screenshot upload field) POSTs to `worker.askhb.no/screenshot`, and the worker renders the project's own URL with Cloudflare Browser Run and stores the PNG itself. Nothing is uploaded from here — a browser cannot screenshot a cross-origin site, so the rendering happens in the worker and only the resulting keys come back.
+
+It shares the upload field's key scheme on purpose. `captureKeyFor` and `keyFor` both build on `entryPrefix` in `src/func/keys.ts`, which is why those helpers live there rather than inside `ImageUploadField`: a capture and a manual upload for the same project must land on the same prefix, or one project's screenshots end up in two places in a bucket nothing can delete from. The capture key carries no extension — the worker appends `-light.png` or `-dark.png`.
+
+Same publish-on-action rule as every other asset here: the image is in the bucket as soon as the button is pressed, and Cancel discards the URL rather than the object.
+
+**The dark capture is the one thing that fails silently.** The worker forces dark by injecting a script that sets `data-theme="dark"` and a `dark` class, which can only surface a dark mode the site already implements. Against a site with none — `trafikkskiltene.no` has none by any mechanism — it captures the ordinary light page, stores it under the `-dark` key and reports success. Neither the worker nor this app can detect it, so the dark checkbox is off by default and the hint says so.
+
+The worker renders only hosts it has been configured with, and that list lives in `r2-worker`'s `wrangler.jsonc`, not here. Deliberately not duplicated: a second copy would drift. An unlisted host comes back as a 400 naming itself, which is what the field shows.
+
+A partial failure is a 502 whose body is worth reading rather than discarding — it names which themes stored before the failure, and whether the failed key still holds an image from an earlier run. That distinction is the difference between "the dark shot is missing" and "the dark shot is old", which look identical on the card, and it matters because r2.askhb.no serves with a four hour `max-age` and one `?v=` is published across both URLs.
 
 ### Every editor is fields on one side, a live preview of askhb.no on the other
 
