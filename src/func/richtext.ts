@@ -133,6 +133,12 @@ const matchEmphasis = (text: string, start: number): EmphasisMatch | null => {
       continue;
     }
 
+    // An empty body is not emphasis. Typing the closing pair before the content
+    // is an ordinary way to write it, and without this the delimiters vanish from
+    // the page for as long as the middle is empty, taking four typed characters
+    // with them. Refused here, so they stay on screen as what they are.
+    if (i === contentStart) return null;
+
     return { end: i + length, length, inner: text.slice(contentStart, i) };
   }
 
