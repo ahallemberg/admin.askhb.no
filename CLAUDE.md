@@ -204,7 +204,7 @@ is a property of how the author works rather than of the entry being edited.
 
 ### readMoreUrl points at the Quartz site
 
-`ExperienceItem.readMoreUrl` drives the "Read more →" link on the portfolio. Long-form write-ups are **not** pages on askhb.no; they are markdown notes in the `obsidian-content` repo, published by Quartz at `pages.askhb.no/<Filename>` (capitals matter). So the correct value looks like `https://pages.askhb.no/Netlight`. A URL under `askhb.no/...` will silently land on the portfolio home page, because askhb.no is an SPA that redirects unknown paths to `/`.
+`ExperienceItem.readMoreUrl` drives the "Read more →" link on the portfolio. Long-form write-ups are **not** pages on askhb.no; they are markdown notes in the `pages-content` repo, published by Quartz at `pages.askhb.no/<Filename>` (capitals matter). So the correct value looks like `https://pages.askhb.no/Netlight`. A URL under `askhb.no/...` will silently land on the portfolio home page, because askhb.no is an SPA that redirects unknown paths to `/`.
 
 ## Gotchas
 
