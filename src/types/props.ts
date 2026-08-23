@@ -70,6 +70,10 @@ interface ProjectItem {
   // means the site has no dark variant, or nobody has captured it — askhb.no
   // falls back to screenshotUrl either way, so absent is always safe.
   screenshotUrlDark?: string;
+  // Which page the screenshot is taken from, when it should not be the project's
+  // own landing page. Stored rather than typed afresh each time so that
+  // re-capturing after a redesign cannot silently go back to the front page.
+  screenshotSourceUrl?: string;
   // Pulled-out figure, e.g. "680,000" with caption "page views".
   figure?: string;
   figureCaption?: string;

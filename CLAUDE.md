@@ -100,6 +100,8 @@ The name therefore has to exist before a file can be chosen; the upload control 
 
 It shares the upload field's key scheme on purpose. `captureKeyFor` and `keyFor` both build on `entryPrefix` in `src/func/keys.ts`, which is why those helpers live there rather than inside `ImageUploadField`: a capture and a manual upload for the same project must land on the same prefix, or one project's screenshots end up in two places in a bucket nothing can delete from. The capture key carries no extension — the worker appends `-light.png` or `-dark.png`.
 
+The page it renders is `screenshotSourceUrl` when set and the project's own `url` otherwise, so a project whose best screenshot is not its front page can name one. That choice is **stored rather than typed per capture** on purpose: the field is empty in the common case, and if it lived only in component state then re-capturing after a redesign would silently go back to the landing page and quietly replace a sub-page shot with the wrong picture. Only the worker's host list constrains it, so any path on an allowed host works.
+
 Same publish-on-action rule as every other asset here: the image is in the bucket as soon as the button is pressed, and Cancel discards the URL rather than the object.
 
 **The dark capture is the one thing that fails silently.** The worker forces dark by injecting a script that sets `data-theme="dark"` and a `dark` class, which can only surface a dark mode the site already implements. Against a site with none — `trafikkskiltene.no` has none by any mechanism — it captures the ordinary light page, stores it under the `-dark` key and reports success. Neither the worker nor this app can detect it, so the dark checkbox is off by default and the hint says so.

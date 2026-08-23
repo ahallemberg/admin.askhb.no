@@ -118,6 +118,8 @@ const ProjectDialog: React.FC<{
 
                 <ScreenshotCapture
                     url={draft.url}
+                    sourceUrl={draft.screenshotSourceUrl}
+                    onSourceUrlChange={(screenshotSourceUrl) => update({ screenshotSourceUrl })}
                     owner={draft.name}
                     light={draft.screenshotUrl}
                     dark={draft.screenshotUrlDark}
