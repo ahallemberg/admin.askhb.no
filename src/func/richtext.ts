@@ -1,10 +1,11 @@
 /*
- * Twin of askhb.no's src/func/richtext.ts. The logic is a copy and the two change
- * together, the same arrangement func/text.ts and func/organisations.ts already
- * use: the editor's preview has to parse by the rules the site renders by, or the
- * preview is confidently wrong. Only the indentation and these comments differ,
- * so `diff -w` against the site's copy should show comment blocks and nothing
- * else -- anything more is drift, and drift here makes the preview lie.
+ * Twin of askhb.no's src/func/richtext.ts. The logic is a copy and the two
+ * change together, the same arrangement func/text.ts and func/organisations.ts
+ * already use: the editor's preview has to parse by the rules the site renders
+ * by, or the preview is confidently wrong. Only the indentation and these
+ * comments differ -- this repo indents src/func at two spaces -- so `diff -w`
+ * between them should show comment blocks and nothing else. Anything more is
+ * drift, and drift here makes the preview lie.
  *
  * Three inline marks over the prose R2 stores as plain strings -- a
  * bracket-and-paren link, a doubled-star bold, a single-star italic -- and
@@ -27,6 +28,10 @@ export type Segment =
 const MAX_DEPTH = 4;
 
 const ABSOLUTE_SCHEME = /^(?:https?:\/\/|mailto:)/i;
+
+// Reserved by RFC 2606, so it can never be a real destination and can never be
+// reached by accident if one of these ever escapes as a live href.
+const RELATIVE_SENTINEL = 'https://relative.invalid';
 
 /*
  * Control characters have no business in a destination, and they are how a
@@ -59,9 +64,25 @@ const resolveHref = (raw: string): string | null => {
   if (url === '' || hasControlChars(url)) return null;
   if (ABSOLUTE_SCHEME.test(url)) return url;
 
-  // Site-relative. A second leading slash is the protocol-relative form, which
-  // would hand the host to whatever the bucket entry says.
-  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  /*
+   * Site-relative, settled by resolving rather than by pattern. A leading slash
+   * is not enough on its own: for an http(s) url a browser reads a backslash as
+   * a slash, so "/\host" is an authority in disguise that resolves to that host
+   * and walks straight past a check looking only for a doubled slash. Worse
+   * than an ordinary external link, because the renderer keys target and rel
+   * off the same leading slash and would give it neither.
+   *
+   * Resolving against a sentinel asks the question that actually matters --
+   * does this stay on the origin it is written on -- instead of guessing at the
+   * ways of writing one that does not.
+   */
+  if (url.startsWith('/')) {
+    try {
+      return new URL(url, RELATIVE_SENTINEL).origin === RELATIVE_SENTINEL ? url : null;
+    } catch {
+      return null;
+    }
+  }
 
   return null;
 };
@@ -145,7 +166,14 @@ const matchEmphasis = (text: string, start: number): EmphasisMatch | null => {
   return null;
 };
 
-const parse = (text: string, depth: number): Segment[] => {
+/*
+ * `linksAllowed` is false inside a link's own label, where a second link is left
+ * as the characters it was written with. An anchor inside an anchor is invalid
+ * HTML, and React builds it faithfully in the live DOM rather than unnesting it
+ * the way an HTML parser would -- leaving only the inner one reachable and the
+ * outer destination impossible to click. CommonMark refuses the same nesting.
+ */
+const parse = (text: string, depth: number, linksAllowed: boolean): Segment[] => {
   if (depth >= MAX_DEPTH) return text === '' ? [] : [{ kind: 'text', value: text }];
 
   const segments: Segment[] = [];
@@ -162,7 +190,7 @@ const parse = (text: string, depth: number): Segment[] => {
   while (i < text.length) {
     const char = text[i];
 
-    if (char === '[') {
+    if (char === '[' && linksAllowed) {
       const link = matchLink(text, i);
 
       if (link) {
@@ -180,7 +208,7 @@ const parse = (text: string, depth: number): Segment[] => {
           segments.push({
             kind: 'link',
             href: link.href,
-            children: parse(link.label, depth + 1),
+            children: parse(link.label, depth + 1, false),
           });
         }
 
@@ -196,7 +224,7 @@ const parse = (text: string, depth: number): Segment[] => {
         flush();
         segments.push({
           kind: emphasis.length === 2 ? 'strong' : 'em',
-          children: parse(emphasis.inner, depth + 1),
+          children: parse(emphasis.inner, depth + 1, linksAllowed),
         });
 
         i = emphasis.end;
@@ -218,4 +246,4 @@ const parse = (text: string, depth: number): Segment[] => {
  * an entry arrives here as undefined.
  */
 export const parseInline = (text: unknown): Segment[] =>
-  typeof text === 'string' ? parse(text, 0) : [];
+  typeof text === 'string' ? parse(text, 0, true) : [];
