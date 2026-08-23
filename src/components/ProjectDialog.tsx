@@ -3,6 +3,7 @@ import type { ProjectItem } from "../types/props";
 import { X } from "lucide-react";
 import EditorDialog from "./EditorDialog";
 import ImageUploadField from "./ImageUploadField";
+import ScreenshotCapture from "./ScreenshotCapture";
 import ProjectPreview from "./preview/ProjectPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
@@ -113,6 +114,18 @@ const ProjectDialog: React.FC<{
                     owner={draft.name}
                     ownerLabel="project name"
                     onChange={(screenshotUrl) => update({ screenshotUrl })}
+                />
+
+                <ScreenshotCapture
+                    url={draft.url}
+                    owner={draft.name}
+                    light={draft.screenshotUrl}
+                    dark={draft.screenshotUrlDark}
+                    onCaptured={({ light, dark }) => update({
+                        ...(light ? { screenshotUrl: light } : {}),
+                        ...(dark ? { screenshotUrlDark: dark } : {}),
+                    })}
+                    onRemoveDark={() => update({ screenshotUrlDark: undefined })}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

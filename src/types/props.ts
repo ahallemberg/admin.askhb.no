@@ -66,6 +66,10 @@ interface ProjectItem {
   description: string;
   url?: string;
   screenshotUrl?: string;
+  // The same shot with the site in dark mode, for a site that has one. Absent
+  // means the site has no dark variant, or nobody has captured it — askhb.no
+  // falls back to screenshotUrl either way, so absent is always safe.
+  screenshotUrlDark?: string;
   // Pulled-out figure, e.g. "680,000" with caption "page views".
   figure?: string;
   figureCaption?: string;

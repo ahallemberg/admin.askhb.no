@@ -41,4 +41,50 @@ async function uploadFileToR2(file: File, endpoint: string, apiKey: string) {
   return response;
 }
 
-export { fetchFromR2, fetchFromR2OrDefault, uploadFileToR2 }
+type CaptureTheme = 'light' | 'dark';
+
+interface CaptureResult {
+  stored: { theme: CaptureTheme; key: string }[];
+  // Present only on a partial failure, which the worker answers with a 502 and a
+  // body worth reading: some themes may already have stored.
+  failed?: { theme: CaptureTheme; key: string; existing: boolean };
+  skipped?: CaptureTheme[];
+  error?: string;
+}
+
+// Asks the worker to render a page and store it, rather than uploading bytes from
+// here — the browser cannot screenshot a cross-origin site, so the rendering
+// happens in Browser Run and only the resulting keys come back.
+async function captureScreenshot(
+  endpoint: string,
+  apiKey: string,
+  request: { url: string; key: string; themes: CaptureTheme[] }
+): Promise<CaptureResult> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Custom-API-Key': apiKey
+    },
+    body: JSON.stringify(request)
+  });
+
+  // A 502 is the one failure whose body has to be read rather than thrown away:
+  // it names which themes stored before the failure, so discarding it would lose
+  // an image that is already in a bucket nothing can delete from.
+  if (response.status === 502) {
+    return await response.json();
+  }
+
+  if (!response.ok) {
+    // statusText is always empty over HTTP/2, which worker.askhb.no serves, so
+    // on its own it renders as "Capture failed: 403 " with no reason at all.
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Capture failed: ${response.status} ${detail || response.statusText || 'no response body'}`);
+  }
+
+  return await response.json();
+}
+
+export { fetchFromR2, fetchFromR2OrDefault, uploadFileToR2, captureScreenshot }
+export type { CaptureTheme, CaptureResult }
