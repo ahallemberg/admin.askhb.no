@@ -121,9 +121,11 @@ worse than no preview, because it is confidently wrong. This has already
 happened once: the previews written before the editorial redesign went on
 showing the old sans-serif card for as long as they survived.
 
-Sharing the components instead would mean a package or a submodule across two
-separately deployed repos, which is not worth it at this size. The mirror is the
-accepted cost; changing both together is the discipline that pays it.
+Sharing the components instead would mean a package across two separately
+deployed repos, which is still not worth it at this size — note that the
+submodule now carrying the palette does **not** carry markup, and widening it to
+do so is a much larger commitment than sharing seven hex values. The mirror is
+the accepted cost; changing both together is the discipline that pays it.
 
 Three deliberate departures from the site, all for the same reason — this is an
 editor holding an unsaved draft:
@@ -140,18 +142,46 @@ JSON file committed to askhb.no's own repo rather than in R2, so nothing here
 can read them, and duplicating the list would add a fourth place to edit to a
 change that already needs three.
 
-### The site's palette lives here too
+### The palette is a shared submodule, and the chrome renders in it
 
-`src/index.css` carries askhb.no's tokens — paper, ink, accent, rules, and the
-serif family — so the preview panes can paint the real thing. Copied from that
-repo's `src/index.css`; the two must agree.
+`theme/` is a **git submodule** pointing at
+`https://github.com/ahallemberg/askhb-theme.git`, shared with askhb.no and
+pages.askhb.no. It replaced a hand-copy of the palette that used to live in
+`src/index.css` and had to be kept in agreement by hand. Don't edit colours
+here: change `tokens.css` in the theme repo, and this repo gets an auto-PR
+bumping the pointer.
 
-Two things about it are load-bearing. The theme block is keyed on a class that
-goes on the preview surface rather than on the document, so the editor chrome
-around a dark preview stays light. And the sans family is deliberately *not*
-redefined: that one is what the admin chrome renders in, and pointing it at the
-site's face would restyle every panel in the app. The preview surface names its
-own font token instead.
+The editor chrome renders in that palette too — page on the faint rule fill,
+cards and dialogs on paper, the three ink levels for text, accent for links and
+focus. Two earlier notes here said the opposite (that the sans family was
+deliberately left alone so the previews could not restyle the app); that was
+true until the editor was asked to stop looking foreign next to the sites.
+
+**`@theme inline` here, where askhb.no uses `@theme static` for the same
+tokens.** This is the one thing to understand before touching `src/index.css`.
+Custom properties are substituted at computed-value time on the element that
+declares them. askhb.no puts its theme class on the document element, the same
+element the mapping is declared on, so mapping through an intermediate name
+resolves correctly. This app puts the theme class on the preview surface, a div
+well below the root — through an intermediate name the mapping would resolve
+against the light value up at the root and descendants would inherit that
+already-substituted result, so **the dark preview would silently stay light**.
+`inline` removes the intermediate: each utility names the shared token directly
+and resolves it where it is applied.
+
+`PreviewSurface` keeps the theme class on the previewed surface alone, with the
+frame around it and the caption below it outside. Everything under that class
+inherits the palette, which is the point for the mirrored components — but it
+would equally catch any chrome that sat inside, flipping a border or a caption
+to the preview's theme while the pane behind stayed light.
+
+**Two pairings fail AA and are the ones to watch when adding UI.** On the faint
+rule fill — the page background, the dialog's preview pane, the role editor's
+header strip — faint ink measures 3.98:1 and the amber notice 4.18:1. Use muted
+ink and `amber-800` on those surfaces; faint ink is fine on paper (4.61:1).
+askhb.no hit the same wall with its skill chips. Destructive red is kept rather
+than folded into the accent: the accent *is* a brick red, and delete needs to
+stay distinguishable from a link.
 
 `usePreviewTheme` remembers the light/dark choice in `localStorage`, because it
 is a property of how the author works rather than of the entry being edited.

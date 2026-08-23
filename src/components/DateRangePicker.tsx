@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { DateRange } from "../types/props";
 import { MONTHS, yearOptions, pickerStateFromRange, rangeFromPickerState, isBackwards, type PickerState } from "../func/dates";
 
-const SELECT_CLASS = "p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors disabled:bg-gray-100 disabled:text-gray-400";
+const SELECT_CLASS = "p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors disabled:bg-rule-faint disabled:text-ink-faint";
 
 const DateRangePicker: React.FC<{
     value: DateRange | undefined;
@@ -83,11 +83,11 @@ const DateRangePicker: React.FC<{
 
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+            <label className="block text-sm font-medium text-ink-muted mb-2">Date</label>
 
             <div className="grid grid-cols-2 gap-3">
                 <div>
-                    <span className="block text-xs text-gray-500 mb-1">Start</span>
+                    <span className="block text-xs text-ink-faint mb-1">Start</span>
                     <div className="flex gap-2">
                         {monthSelect('startMonth', state.yearOnly)}
                         {yearSelect('startYear', false)}
@@ -95,7 +95,7 @@ const DateRangePicker: React.FC<{
                 </div>
 
                 <div>
-                    <span className="block text-xs text-gray-500 mb-1">End</span>
+                    <span className="block text-xs text-ink-faint mb-1">End</span>
                     <div className="flex gap-2">
                         {monthSelect('endMonth', endDisabled || state.yearOnly)}
                         {yearSelect('endYear', endDisabled)}
@@ -114,7 +114,7 @@ const DateRangePicker: React.FC<{
                     <option value="none">No end date</option>
                 </select>
 
-                <label className="flex items-center gap-2 text-sm text-gray-700">
+                <label className="flex items-center gap-2 text-sm text-ink-muted">
                     <input
                         type="checkbox"
                         checked={state.yearOnly}

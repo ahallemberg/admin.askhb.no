@@ -20,16 +20,16 @@ const PreviewSurface: React.FC<{ children: React.ReactNode; note?: string }> = (
 
     const tab = (active: boolean) =>
         `flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
-            active ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            active ? 'bg-paper text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
         }`;
 
     return (
         <div className="flex h-full min-h-0 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-4 px-6 pt-6 pb-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Live preview</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Live preview</p>
                 {/* A pair of buttons rather than one toggle: which theme is showing
                     has to be readable at a glance, not inferred from an icon. */}
-                <div className="flex items-center gap-0.5 rounded-md bg-gray-100 p-0.5" role="group" aria-label="Preview theme">
+                <div className="flex items-center gap-0.5 rounded-md bg-rule-faint p-0.5" role="group" aria-label="Preview theme">
                     <button type="button" onClick={() => setTheme('light')} className={tab(theme === 'light')} aria-pressed={theme === 'light'}>
                         <Sun className="h-3.5 w-3.5" />
                         Light
@@ -41,18 +41,28 @@ const PreviewSurface: React.FC<{ children: React.ReactNode; note?: string }> = (
                 </div>
             </div>
 
-            {/*
-             * The theme class goes here, not on the document, so the editor
-             * around the pane stays light whichever theme is being previewed.
-             * The tokens are custom properties, so everything below inherits the
-             * switch without knowing it exists.
-             */}
-            <div className={`min-h-0 flex-1 overflow-y-auto px-6 pb-6 ${theme === 'dark' ? 'dark' : ''}`}>
-                <div className="font-preview bg-paper text-ink mx-auto w-full max-w-[36rem] rounded border border-gray-200 px-6 py-8">
-                    {children}
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+                {/*
+                 * The frame is chrome and stays light; the theme class goes on
+                 * the surface inside it, not on the document, so the editor
+                 * around a dark preview stays light too.
+                 *
+                 * The two are separate elements on purpose. Everything under the
+                 * theme class inherits the palette, which is the point for the
+                 * mirrored components -- but it would also catch any chrome that
+                 * happened to sit inside, flipping a border or a caption to the
+                 * preview's theme while the pane behind it stayed light. Keeping
+                 * the class on the surface alone means only what is meant to be
+                 * previewed can flip, and the note below is outside it for the
+                 * same reason.
+                 */}
+                <div className="mx-auto w-full max-w-[36rem] overflow-hidden rounded border border-rule">
+                    <div className={`font-preview bg-paper text-ink px-6 py-8 ${theme === 'dark' ? 'dark' : ''}`}>
+                        {children}
+                    </div>
                 </div>
 
-                {note && <p className="mx-auto mt-3 max-w-[36rem] text-xs text-gray-500">{note}</p>}
+                {note && <p className="mx-auto mt-3 max-w-[36rem] text-xs text-ink-muted">{note}</p>}
             </div>
         </div>
     );

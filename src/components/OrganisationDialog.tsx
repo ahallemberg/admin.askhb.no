@@ -12,7 +12,7 @@ import { formatDateRange } from "../func/dates";
 import { LOGO_DIR } from "../constants/app";
 import type { PublishedPage } from "../func/pages";
 
-const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
+const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
 // The bounds offered by the logo scale input. Values outside them are still stored
 // — nothing enforces an input's min/max — so they are called out instead. The
@@ -150,7 +150,7 @@ const OrganisationDialog: React.FC<{
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                            <label className="block text-sm font-medium text-ink-muted mb-2">Company</label>
                             <input
                                 type="text"
                                 value={fields.company}
@@ -159,7 +159,7 @@ const OrganisationDialog: React.FC<{
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Location (optional)</label>
+                            <label className="block text-sm font-medium text-ink-muted mb-2">Location (optional)</label>
                             <input
                                 type="text"
                                 value={fields.location ?? ''}
@@ -170,24 +170,24 @@ const OrganisationDialog: React.FC<{
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Commitment (optional)</label>
+                        <label className="block text-sm font-medium text-ink-muted mb-2">Commitment (optional)</label>
                         <input
                             type="text"
                             value={fields.commitment ?? ''}
                             onChange={(e) => setFields(prev => ({ ...prev, commitment: e.target.value === '' ? undefined : e.target.value }))}
                             className={FIELD_CLASS}
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-ink-faint">
                             e.g. "Volunteer, 25+ hrs/week". Renders beside the date span.
                         </p>
                     </div>
 
                     <div>
-                        <span className="block text-sm font-medium text-gray-700 mb-2">Date</span>
-                        <p className="p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-gray-700">
-                            {derived.date || <span className="text-gray-400">Set by the roles below</span>}
+                        <span className="block text-sm font-medium text-ink-muted mb-2">Date</span>
+                        <p className="p-3 border border-dashed border-rule rounded-lg bg-rule-faint text-ink-muted">
+                            {derived.date || <span className="text-ink-muted">Set by the roles below</span>}
                         </p>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-ink-faint">
                             Derived from the roles — earliest start to latest end — and not editable here.
                             Change a role's date to change it.
                         </p>
@@ -203,7 +203,7 @@ const OrganisationDialog: React.FC<{
                     />
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Logo scale (optional)</label>
+                        <label className="block text-sm font-medium text-ink-muted mb-2">Logo scale (optional)</label>
                         <input
                             type="number"
                             step="0.05"
@@ -222,7 +222,7 @@ const OrganisationDialog: React.FC<{
                             }}
                             className={FIELD_CLASS}
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-ink-faint">
                             Optical size correction. Marks differ in ink coverage, so equal boxes look
                             unequal. 1 is unscaled. The preview shows the result at the size the site
                             renders it.
@@ -237,11 +237,11 @@ const OrganisationDialog: React.FC<{
 
                 <div>
                     <div className="flex justify-between items-center mb-3">
-                        <label className="block text-sm font-medium text-gray-700">Roles</label>
+                        <label className="block text-sm font-medium text-ink-muted">Roles</label>
                         <button
                             type="button"
                             onClick={addRole}
-                            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                            className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors"
                         >
                             <Plus className="w-4 h-4" />
                             Add role

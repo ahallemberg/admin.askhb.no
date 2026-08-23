@@ -26,12 +26,12 @@ const EditorDialog: React.FC<{
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-            <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">
-                <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
+        <div className="fixed inset-0 z-50 flex flex-col bg-paper">
+            <header className="flex shrink-0 items-center justify-between border-b border-rule px-6 py-4">
+                <h3 className="text-xl font-semibold text-ink">{title}</h3>
                 <button
                     onClick={onClose}
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="p-2 text-ink-faint hover:text-ink-muted transition-colors"
                     aria-label="Close"
                 >
                     <X className="w-5 h-5" />
@@ -53,21 +53,21 @@ const EditorDialog: React.FC<{
                     so the theme switch above it stays reachable at the top of a
                     long entry. Below the breakpoint it has no height of its own
                     and simply extends the single scroller. */}
-                <div className="min-h-0 border-t border-gray-200 bg-gray-50 lg:overflow-hidden lg:border-t-0 lg:border-l">
+                <div className="min-h-0 border-t border-rule bg-rule-faint lg:overflow-hidden lg:border-t-0 lg:border-l">
                     {preview}
                 </div>
             </div>
 
-            <footer className="flex shrink-0 justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <footer className="flex shrink-0 justify-end gap-3 border-t border-rule px-6 py-4">
                 <button
                     onClick={onClose}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="px-4 py-2 text-ink-muted hover:text-ink transition-colors"
                 >
                     Cancel
                 </button>
                 <button
                     onClick={onSave}
-                    className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                    className="px-4 py-2 bg-ink text-paper rounded-lg hover:bg-ink-muted transition-colors"
                 >
                     Save
                 </button>

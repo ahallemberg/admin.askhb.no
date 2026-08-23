@@ -124,8 +124,8 @@ const DraggableList = <T,>({ items, onReorder, renderItem }: DraggableListProps<
                     className: `
                         relative transition-all duration-200
                         ${isDragging ? 'opacity-50 scale-95' : ''}
-                        ${isDragOver && dropPosition === 'above' ? 'border-t-4 border-blue-500' : ''}
-                        ${isDragOver && dropPosition === 'below' ? 'border-b-4 border-blue-500' : ''}
+                        ${isDragOver && dropPosition === 'above' ? 'border-t-4 border-accent' : ''}
+                        ${isDragOver && dropPosition === 'below' ? 'border-b-4 border-accent' : ''}
                     `.trim()
                 };
 

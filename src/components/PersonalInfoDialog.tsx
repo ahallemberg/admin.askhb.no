@@ -6,7 +6,7 @@ import PreviewSurface from "./preview/PreviewSurface";
 import ProfilePictureField from "./ProfilePictureField";
 import { deepEqual } from "../func/compare";
 
-const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
+const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
 /*
  * The fields this dialog owns. cvUrl is deliberately not among them: it is set
@@ -87,7 +87,7 @@ const PersonalInfoDialog: React.FC<{
                 />
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Name</label>
                     <input
                         type="text"
                         value={draft.name}
@@ -96,7 +96,7 @@ const PersonalInfoDialog: React.FC<{
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Title</label>
                     <input
                         type="text"
                         value={draft.title}
@@ -105,14 +105,14 @@ const PersonalInfoDialog: React.FC<{
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">About</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">About</label>
                     <textarea
                         value={draft.about}
                         onChange={(e) => update({ about: e.target.value })}
                         rows={14}
                         className={FIELD_CLASS + " resize-y"}
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-ink-faint">
                         A blank line starts a new paragraph. A single line break does not — it renders as a space.
                     </p>
                 </div>

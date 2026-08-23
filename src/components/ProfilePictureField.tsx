@@ -66,18 +66,18 @@ const ProfilePictureField: React.FC<{
 
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Profile photo</label>
+            <label className="block text-sm font-medium text-ink-muted mb-2">Profile photo</label>
             <div className="flex items-center gap-3">
                 {/* The stored URL when there is one, so a fresh upload shows here
                     rather than whatever the browser cached for the bare key. */}
                 <img
                     src={value || R2_PROFILE_PICTURE}
                     alt=""
-                    className="w-16 h-16 object-contain border border-gray-200 rounded"
+                    className="w-16 h-16 object-contain border border-rule rounded"
                 />
                 <label
-                    className={`flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg transition-colors ${
-                        isUploading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'
+                    className={`flex items-center gap-2 px-3 py-2 border border-rule rounded-lg transition-colors ${
+                        isUploading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-rule-faint'
                     }`}
                 >
                     <Upload className="w-4 h-4" />
@@ -101,11 +101,11 @@ const ProfilePictureField: React.FC<{
 
             {status.state === 'error' && <p className="mt-1 text-sm text-red-700">{status.message}</p>}
 
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-ink-faint">
                 Square images work best; the site renders it small, so anything past about 512px is
                 wasted bytes on every visit.
             </p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-ink-faint">
                 Choosing a file replaces the photo in the bucket immediately, whether or not you save,
                 and the one it replaces cannot be recovered. Cancel will not put it back. Saving is what
                 gets the new photo past the site's four hour image cache — without it the change shows
