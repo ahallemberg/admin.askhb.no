@@ -131,7 +131,7 @@ const EducationDialog: React.FC<{
                         rail beside the entry. Said here because the pattern is
                         strict and the preview is the only other place it shows. */}
                     <p className="mt-2 text-xs text-ink-faint">
-                        A line written exactly as "GPA: 4,79/5" is pulled out and rendered on its own. Supports [text](url), **bold** and *italic*.
+                        A line written exactly as "GPA: 4,79/5" is pulled out and rendered on its own. Supports [text](https://example.com), **bold** and *italic*.
                     </p>
                 </div>
             </div>

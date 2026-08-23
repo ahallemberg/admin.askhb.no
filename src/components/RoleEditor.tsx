@@ -133,7 +133,7 @@ const RoleEditor: React.FC<{
                         className={FIELD_CLASS + " resize-none"}
                     />
                     <p className="mt-1 text-xs text-ink-faint">
-                        Supports [text](url), **bold** and *italic*.
+                        Supports [text](https://example.com), **bold** and *italic*.
                     </p>
                 </div>
 

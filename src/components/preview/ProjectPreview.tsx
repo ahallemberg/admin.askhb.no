@@ -5,11 +5,15 @@ import RichTextPreview from './RichTextPreview';
  * Mirrors askhb.no's src/components/ProjectItem.tsx. Restyling that file makes
  * this stale -- change both together.
  *
- * One deliberate departure: the site wraps the whole card in an anchor when the
- * project has a url. Here the card is never a link. A click that navigates away
- * from a dialog holding an unsaved draft loses the draft, and the url is already
- * shown as text in the field beside this pane, which is the better place to
- * check it anyway.
+ * One deliberate departure: on the site the card is clickable as a whole -- the
+ * name carries the link and stretches a pseudo-element across the card -- while
+ * here the card is never a link at all. A click that navigates away from a dialog
+ * holding an unsaved draft loses the draft, and the url is already shown as text
+ * in the field beside this pane, which is the better place to check it anyway.
+ *
+ * That is also why none of the stretched-link machinery is mirrored: without an
+ * anchor there is nothing to stretch, and nothing in the description to lift
+ * clear of it.
  */
 const CARD_CLASS = 'flex h-full flex-col rounded-[3px] border border-rule bg-rule-faint';
 

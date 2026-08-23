@@ -6,10 +6,9 @@ import { parseInline, type Segment } from '../../func/richtext';
  *
  * One deliberate departure, the same one this pane already makes everywhere else:
  * links are rendered as text, not as anchors. RolePreview does it for its link row
- * and ProjectPreview refuses to wrap its card at all, for the reason that applies
- * here too -- a click that navigates away from a dialog holding an unsaved draft
- * destroys the draft, and the destination is readable in the field beside this
- * pane.
+ * and ProjectPreview leaves its card inert, for the reason that applies here too
+ * -- a click that navigates away from a dialog holding an unsaved draft destroys
+ * the draft, and the destination is readable in the field beside this pane.
  *
  * The styling is the site's, so what is previewed is what will ship: accent with
  * an underline rather than accent alone, because colour against body copy is

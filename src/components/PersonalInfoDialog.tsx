@@ -113,7 +113,7 @@ const PersonalInfoDialog: React.FC<{
                         className={FIELD_CLASS + " resize-y"}
                     />
                     <p className="mt-1 text-xs text-ink-faint">
-                        A blank line starts a new paragraph. A single line break does not — it renders as a space. Supports [text](url), **bold** and *italic*.
+                        A blank line starts a new paragraph. A single line break does not — it renders as a space. Supports [text](https://example.com), **bold** and *italic*.
                     </p>
                 </div>
             </div>
