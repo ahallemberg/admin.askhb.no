@@ -1,4 +1,5 @@
 import type { ProjectItem } from '../../types/props';
+import RichTextPreview from './RichTextPreview';
 
 /*
  * Mirrors askhb.no's src/components/ProjectItem.tsx. Restyling that file makes
@@ -10,7 +11,7 @@ import type { ProjectItem } from '../../types/props';
  * shown as text in the field beside this pane, which is the better place to
  * check it anyway.
  */
-const CARD_CLASS = 'flex h-full flex-col overflow-hidden rounded-[3px] border border-rule bg-rule-faint';
+const CARD_CLASS = 'flex h-full flex-col rounded-[3px] border border-rule bg-rule-faint';
 
 const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
     const skills = project.skills ?? [];
@@ -44,7 +45,7 @@ const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
                     <img
                         src={project.screenshotUrl}
                         alt=""
-                        className="aspect-[16/10] w-full border-b border-rule object-cover object-top"
+                        className="aspect-[16/10] w-full rounded-t-[2px] border-b border-rule object-cover object-top"
                     />
                 )}
 
@@ -53,7 +54,9 @@ const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
                         ? <h3 className="font-serif text-lg font-semibold text-ink">{name}</h3>
                         : <h3 className="font-serif text-lg font-semibold text-ink-muted italic">Untitled project</h3>}
 
-                    <p className="mt-2 leading-relaxed text-ink-muted">{project.description}</p>
+                    <p className="mt-2 leading-relaxed text-ink-muted">
+                        <RichTextPreview text={project.description} />
+                    </p>
 
                     {/* Paper rather than the faint rule fill the page chips take:
                         on this card that fill is the card, so those chips would

@@ -1,4 +1,5 @@
 import type { EducationItem } from '../../types/props';
+import RichTextPreview from './RichTextPreview';
 
 /*
  * Mirrors askhb.no's src/components/EducationItem.tsx. Restyling that file makes
@@ -59,7 +60,9 @@ const EducationPreview: React.FC<{ education: EducationItem }> = ({ education })
                 )}
 
                 {rest.map((line, index) => (
-                    <p key={index} className="mt-2 leading-relaxed text-ink-muted">{line}</p>
+                    <p key={index} className="mt-2 leading-relaxed text-ink-muted">
+                        <RichTextPreview text={line} />
+                    </p>
                 ))}
             </div>
 
