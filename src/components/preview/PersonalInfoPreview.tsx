@@ -2,6 +2,7 @@ import { Download } from 'lucide-react';
 import type { PersonalInfo } from '../../types/props';
 import { splitParagraphs } from '../../func/text';
 import { R2_PROFILE_PICTURE } from '../../constants/app';
+import RichTextPreview from './RichTextPreview';
 
 /*
  * Mirrors the header and About section of askhb.no's src/pages/Portfolio.tsx.
@@ -53,7 +54,7 @@ const PersonalInfoPreview: React.FC<{ personalInfo: PersonalInfo }> = ({ persona
                 </h2>
                 {about.map((paragraph, index) => (
                     <p key={index} className={`text-ink-muted leading-relaxed ${index > 0 ? 'mt-4' : ''}`}>
-                        {paragraph}
+                        <RichTextPreview text={paragraph} />
                     </p>
                 ))}
             </section>
