@@ -3,7 +3,7 @@ import PortfolioEditor from './pages/PortfolioEditor'
 
 function App() {
     useEffect(() => {
-        document.body.classList.add('bg-gray-100');
+        document.body.classList.add('bg-rule-faint');
     }, [])
     
     return (

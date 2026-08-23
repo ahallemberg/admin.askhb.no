@@ -51,7 +51,7 @@ const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
                 <div className="flex flex-1 flex-col p-5">
                     {name
                         ? <h3 className="font-serif text-lg font-semibold text-ink">{name}</h3>
-                        : <h3 className="font-serif text-lg font-semibold text-ink-faint italic">Untitled project</h3>}
+                        : <h3 className="font-serif text-lg font-semibold text-ink-muted italic">Untitled project</h3>}
 
                     <p className="mt-2 leading-relaxed text-ink-muted">{project.description}</p>
 

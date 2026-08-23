@@ -121,12 +121,12 @@ const ImageUploadField: React.FC<{
 
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <label className="block text-sm font-medium text-ink-muted mb-1">{label}</label>
             <div className="flex items-center gap-3">
-                {value && <img src={value} alt="" className="w-10 h-10 object-contain border border-gray-200 rounded" />}
+                {value && <img src={value} alt="" className="w-10 h-10 object-contain border border-rule rounded" />}
                 <label
-                    className={`flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg transition-colors ${
-                        canUpload ? 'cursor-pointer hover:bg-gray-50' : 'opacity-40 cursor-not-allowed'
+                    className={`flex items-center gap-2 px-3 py-2 border border-rule rounded-lg transition-colors ${
+                        canUpload ? 'cursor-pointer hover:bg-rule-faint' : 'opacity-40 cursor-not-allowed'
                     }`}
                     title={canUpload ? undefined : `Set the ${ownerLabel} first`}
                 >
@@ -154,7 +154,7 @@ const ImageUploadField: React.FC<{
                         type="button"
                         onClick={handleRemove}
                         disabled={isUploading}
-                        className="p-2 text-gray-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="p-2 text-ink-faint hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         title={isUploading ? 'Wait for the upload to finish' : 'Remove'}
                     >
                         <X className="w-4 h-4" />
@@ -168,7 +168,7 @@ const ImageUploadField: React.FC<{
                     cannot overwrite each other's image.
                 </p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-ink-faint">
                 Uploading is itself a publish: the file goes to the bucket the moment you choose it,
                 whether or not you save. Removing clears the link only. The file stays in the bucket and
                 remains publicly reachable.

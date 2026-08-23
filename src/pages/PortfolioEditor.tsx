@@ -361,7 +361,7 @@ const PortfolioEditor: React.FC = () => {
 
     
     return (
-        <div className="bg-gray-100 min-h-screen font-sans">
+        <div className="bg-rule-faint min-h-screen font-sans">
             <div className="container mx-auto px-4 py-8 max-w-6xl">
                 {/* Header */}
                 <header className="py-8 text-center">
@@ -369,10 +369,10 @@ const PortfolioEditor: React.FC = () => {
                         <h1 className="text-3xl font-bold">Portfolio Editor</h1>
                         <div className="flex items-center gap-4">
                             {isDirty && (
-                                <span className="text-sm text-amber-700">Unsaved changes</span>
+                                <span className="text-sm text-amber-800">Unsaved changes</span>
                             )}
                             {!isDirty && migration && (
-                                <span className="text-sm text-gray-500">{describeMigration(migration)}</span>
+                                <span className="text-sm text-ink-muted">{describeMigration(migration)}</span>
                             )}
                             <button
                                 onClick={savePortfolio}
@@ -386,7 +386,7 @@ const PortfolioEditor: React.FC = () => {
                                         : isSaving ? 'Saving…'
                                         : undefined
                                 }
-                                className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-lg hover:bg-ink-muted disabled:bg-ink-faint disabled:cursor-not-allowed transition-colors"
                             >
                                 <Save className="w-5 h-5" />
                                 {isSaving ? 'Saving…' : 'Save Portfolio'}
@@ -398,7 +398,7 @@ const PortfolioEditor: React.FC = () => {
                 {/* Loading State */}
                 {isLoading && (
                     <div className="flex items-center justify-center py-12">
-                        <div className="text-gray-600">Loading portfolio data...</div>
+                        <div className="text-ink-muted">Loading portfolio data...</div>
                     </div>
                 )}
                 
@@ -439,7 +439,7 @@ const PortfolioEditor: React.FC = () => {
                                     <h2 className="text-2xl font-bold">Experience</h2>
                                     <button
                                         onClick={() => setOrganisationDialog({ isOpen: true })}
-                                        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                                        className="flex items-center gap-2 text-ink-muted hover:text-ink transition-colors"
                                     >
                                         <Plus className="w-4 h-4" />
                                         Add Organisation
@@ -466,7 +466,7 @@ const PortfolioEditor: React.FC = () => {
                                     <h2 className="text-2xl font-bold">Projects</h2>
                                     <button
                                         onClick={() => setProjectDialog({ isOpen: true })}
-                                        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                                        className="flex items-center gap-2 text-ink-muted hover:text-ink transition-colors"
                                     >
                                         <Plus className="w-4 h-4" />
                                         Add Project
@@ -493,7 +493,7 @@ const PortfolioEditor: React.FC = () => {
                                     <h2 className="text-2xl font-bold">Education</h2>
                                     <button
                                         onClick={() => setEducationDialog({ isOpen: true })}
-                                        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                                        className="flex items-center gap-2 text-ink-muted hover:text-ink transition-colors"
                                     >
                                         <Plus className="w-4 h-4" />
                                         Add Education

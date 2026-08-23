@@ -68,14 +68,14 @@ const CvSection: React.FC<{
         <section className="mb-8">
             <h2 className="text-2xl font-bold mb-4">CV</h2>
 
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <div className="bg-paper rounded-lg p-6 shadow-sm border border-rule">
                 {personalInfo.cvUrl ? (
                     <div className="flex items-center justify-between gap-4">
                         <a
                             href={personalInfo.cvUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition-colors"
+                            className="flex items-center gap-2 text-ink-muted hover:text-accent transition-colors"
                         >
                             <FileText className="w-4 h-4" />
                             <span className="text-sm">{personalInfo.cvUrl}</span>
@@ -84,14 +84,14 @@ const CvSection: React.FC<{
                             onClick={handleRemove}
                             disabled={isUploading}
                             title={isUploading ? 'Wait for the upload to finish' : 'Remove the CV link from the portfolio'}
-                            className="text-gray-400 hover:text-red-600 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+                            className="text-ink-faint hover:text-red-600 disabled:text-rule disabled:cursor-not-allowed transition-colors"
                             aria-label="Remove CV from the portfolio"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
                     </div>
                 ) : (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-ink-faint">
                         No CV linked. The portfolio hides its download button until one is
                         uploaded. Note that an uploaded PDF is publicly reachable at its URL
                         whether or not it is linked.
@@ -114,14 +114,14 @@ const CvSection: React.FC<{
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
-                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                        className="flex items-center gap-2 bg-ink hover:bg-ink-muted disabled:bg-ink-faint disabled:cursor-not-allowed text-paper px-4 py-2 rounded-lg transition-colors"
                     >
                         <Upload className="w-4 h-4" />
                         {isUploading ? 'Uploading...' : hasCv ? 'Replace PDF' : 'Upload PDF'}
                     </button>
 
                     {status.state === 'done' && (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-ink-muted">
                             Uploaded. The file is already public; press Save so the
                             site links this version instead of a cached one.
                         </p>
