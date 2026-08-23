@@ -66,7 +66,10 @@ const ScreenshotCapture: React.FC<{
      */
     const hostOf = (value: string) => {
         try {
-            return new URL(value).hostname.toLowerCase();
+            // `www.` dropped before comparing, as askhb.no does when it prints a
+            // project's host: veivett.no and www.veivett.no are one site, and
+            // warning about the pair would be noise on a legitimate value.
+            return new URL(value).hostname.toLowerCase().replace(/^www\./, '');
         } catch {
             return undefined;
         }
