@@ -3,11 +3,23 @@ import type { DragHandleProps } from '../types/props';
 
 interface DraggableListProps<T> {
     items: T[];
-    onReorder: (newItems: T[]) => void;
+    /*
+     * One stable key per item, index-aligned with `items`. Reordering applies the
+     * same splice to both and hands both back, so a caller tracking anything
+     * alongside the list never has to work out the permutation itself.
+     *
+     * That matters because the only way to recover it from the reordered array
+     * alone is object identity, and identity is not reliable here: a dialog saved
+     * without typing anything passes back the frozen blank entry it started from,
+     * so adding two blank projects puts one object in two slots and indexOf
+     * answers the same index for both.
+     */
+    keys: string[];
+    onReorder: (newItems: T[], newKeys: string[]) => void;
     renderItem: (item: T, index: number, dragHandleProps: DragHandleProps) => ReactElement;
 }
 
-const DraggableList = <T,>({ items, onReorder, renderItem }: DraggableListProps<T>) => {
+const DraggableList = <T,>({ items, keys, onReorder, renderItem }: DraggableListProps<T>) => {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [dropPosition, setDropPosition] = useState<'above' | 'below'>('below');
@@ -71,10 +83,13 @@ const DraggableList = <T,>({ items, onReorder, renderItem }: DraggableListProps<
         
         if (draggedIndex !== null && draggedIndex !== dropIndex) {
             const newItems = [...items];
+            const newKeys = [...keys];
             const draggedItem = newItems[draggedIndex];
+            const draggedKey = newKeys[draggedIndex];
             
             // Remove the dragged item
             newItems.splice(draggedIndex, 1);
+            newKeys.splice(draggedIndex, 1);
             
             // Calculate the new insert position
             let insertIndex = dropIndex;
@@ -91,8 +106,9 @@ const DraggableList = <T,>({ items, onReorder, renderItem }: DraggableListProps<
             
             // Insert the item at the new position
             newItems.splice(insertIndex, 0, draggedItem);
+            newKeys.splice(insertIndex, 0, draggedKey);
             
-            onReorder(newItems);
+            onReorder(newItems, newKeys);
         }
         
         setDraggedIndex(null);
@@ -130,7 +146,7 @@ const DraggableList = <T,>({ items, onReorder, renderItem }: DraggableListProps<
                 };
 
                 return (
-                    <div key={index} {...containerProps}>
+                    <div key={keys[index]} {...containerProps}>
                         {renderItem(item, index, dragHandleProps)}
                     </div>
                 );
