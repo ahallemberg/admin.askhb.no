@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Save } from 'lucide-react';
+import { Plus, Save, ChevronDown } from 'lucide-react';
 import EducationCard from '../components/EducationCard';
 import EducationDialog from '../components/EducationDialog';
 import OrganisationCard from '../components/OrganisationCard';
@@ -17,6 +17,8 @@ import { groupExperiences, isOrganisationArray } from '../func/organisations';
 import { fetchPublishedPages, type PublishedPage } from '../func/pages';
 import { deepEqual } from '../func/compare';
 import { useConfirm } from '../func/confirmContext';
+import { EMPTY_IDS, mintIds, withAdded, withOrder, withRemoved, type EntryIds } from '../func/entryIds';
+import { badgeFor, describeChanges, labelFor, type Change, type ChangeSection } from '../func/changes';
 import Toast from '../components/Toast';
 import Notice from '../components/Notice';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH, PROJECTS_PATH } from '../constants/app';
@@ -45,6 +47,16 @@ Object.freeze(BLANK_EDUCATION);
 Object.freeze(BLANK_EDUCATION.description);
 Object.freeze(BLANK_PROJECT);
 
+// Green reads as arrival, red as loss, amber as alteration, and a neutral for a
+// move that changed no content. Semantic rather than palette: the theme tokens
+// carry the brand, these carry meaning.
+const DOT: Record<Change['kind'], string> = {
+    added: 'bg-green-700',
+    edited: 'bg-amber-700',
+    deleted: 'bg-red-600',
+    reordered: 'bg-ink-faint'
+};
+
 const plural = (count: number, singular: string, pluralForm: string) =>
     `${count} ${count === 1 ? singular : pluralForm}`;
 
@@ -58,6 +70,19 @@ const describeMigration = ({ reformatted, structured, regrouped }: { reformatted
         ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
         : parts[0];
     return `${joined} on the next save`;
+};
+
+// Sits beside a section heading when that section carries unsaved edits. Says
+// how many, except for a section where only the order moved -- counting entries
+// nobody edited would be a number that means nothing.
+const SectionBadge: React.FC<{ changes: Change[] }> = ({ changes }) => {
+    const label = badgeFor(changes);
+    if (!label) return null;
+    return (
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11.5px] font-semibold tabular-nums text-amber-800">
+            {label}
+        </span>
+    );
 };
 
 const PortfolioEditor: React.FC = () => {
@@ -88,6 +113,17 @@ const PortfolioEditor: React.FC = () => {
     // What is known to be in R2: set after a successful load and after a fully
     // successful save. Anything else on screen means unsaved changes.
     const [savedSnapshot, setSavedSnapshot] = useState<PortfolioData | null>(null);
+    /*
+     * Identity for entries that carry none, so a rename reads as one edit rather
+     * than a delete and an add. Held beside the data, never inside it: these are
+     * minted per page load, so an id living on the entry itself would travel into
+     * the bucket and into every comparison against it.
+     *
+     * `savedEntryIds` is the same set as of the last successful save, which is
+     * what the two sides of the diff are matched on.
+     */
+    const [entryIds, setEntryIds] = useState<EntryIds>(EMPTY_IDS);
+    const [savedEntryIds, setSavedEntryIds] = useState<EntryIds | null>(null);
     // A failed save leaves R2 mixed even when the user had made no edits, so the
     // editor must keep saying so rather than looking clean because nothing changed.
     const [saveFailed, setSaveFailed] = useState(false);
@@ -125,6 +161,7 @@ const PortfolioEditor: React.FC = () => {
 
     // No editIndex: there is one personal info object, so this is open or shut.
     const [personalInfoDialog, setPersonalInfoDialog] = useState(false);
+    const [showChanges, setShowChanges] = useState(false);
     
     useEffect(() => {
         const loadPortfolioData = async () => {
@@ -183,8 +220,11 @@ const PortfolioEditor: React.FC = () => {
 
                 // Snapshot the normalised form, not the raw fetch: otherwise the editor
                 // would report unsaved changes the instant it finished loading.
+                const ids = mintIds(loaded);
                 setSavedSnapshot(loaded);
+                setSavedEntryIds(ids);
                 setPortfolio(loaded);
+                setEntryIds(ids);
                 
             } catch (error) {
                 console.error('Error loading portfolio data:', error);
@@ -229,6 +269,9 @@ const PortfolioEditor: React.FC = () => {
                 ? prev.experiences.map((org, i) => i === editIndex ? organisation : org)
                 : [...prev.experiences, organisation]
         }));
+        // Only the add branch mints. Editing must keep the entry's id, which is
+        // what makes a rename one change instead of two.
+        if (editIndex === undefined) setEntryIds(prev => withAdded(prev, 'experiences'));
     };
 
     const handleDeleteOrganisation = async (index: number) => {
@@ -253,13 +296,15 @@ const PortfolioEditor: React.FC = () => {
             ...prev,
             experiences: prev.experiences.filter((_, i) => i !== index)
         }));
+        setEntryIds(prev => withRemoved(prev, 'experiences', index));
     };
 
-    const handleReorderOrganisations = (newOrganisations: Organisation[]) => {
+    const handleReorderOrganisations = (newOrganisations: typeof portfolio.experiences, order: string[]) => {
         setPortfolio(prev => ({
             ...prev,
             experiences: newOrganisations
         }));
+        setEntryIds(prev => withOrder(prev, 'experiences', order));
     };
 
     const handleSaveProject = (project: ProjectItem) => {
@@ -270,6 +315,7 @@ const PortfolioEditor: React.FC = () => {
                 ? prev.projects.map((item, i) => i === editIndex ? project : item)
                 : [...prev.projects, project]
         }));
+        if (editIndex === undefined) setEntryIds(prev => withAdded(prev, 'projects'));
     };
 
     const handleDeleteProject = async (index: number) => {
@@ -287,13 +333,15 @@ const PortfolioEditor: React.FC = () => {
             ...prev,
             projects: prev.projects.filter((_, i) => i !== index)
         }));
+        setEntryIds(prev => withRemoved(prev, 'projects', index));
     };
 
-    const handleReorderProjects = (newProjects: ProjectItem[]) => {
+    const handleReorderProjects = (newProjects: typeof portfolio.projects, order: string[]) => {
         setPortfolio(prev => ({
             ...prev,
             projects: newProjects
         }));
+        setEntryIds(prev => withOrder(prev, 'projects', order));
     };
     
     const handleSaveEducation = (education: EducationItem) => {
@@ -304,6 +352,7 @@ const PortfolioEditor: React.FC = () => {
                 ? prev.education.map((edu, i) => i === editIndex ? education : edu)
                 : [...prev.education, education]
         }));
+        if (editIndex === undefined) setEntryIds(prev => withAdded(prev, 'education'));
     };
     
     const handleDeleteEducation = async (index: number) => {
@@ -322,15 +371,32 @@ const PortfolioEditor: React.FC = () => {
             ...prev,
             education: prev.education.filter((_, i) => i !== index)
         }));
+        setEntryIds(prev => withRemoved(prev, 'education', index));
     };
 
-    const handleReorderEducation = (newEducation: EducationItem[]) => {
+    const handleReorderEducation = (newEducation: typeof portfolio.education, order: string[]) => {
         setPortfolio(prev => ({
             ...prev,
             education: newEducation
         }));
+        setEntryIds(prev => withOrder(prev, 'education', order));
     };
     
+    /*
+     * The changes themselves, and their per-section tallies. Derived rather than
+     * tracked: anything remembered alongside the edits is one more thing that can
+     * disagree with them.
+     *
+     * Computed from the snapshots alone, so `saveFailed` is deliberately not part
+     * of it. A partial save leaves the bucket mixed with nothing pending, and a
+     * count of zero changes is the honest answer to "what have I edited" — it is
+     * the unsaved-changes indicator's job to keep reporting the mixed bucket.
+     */
+    const changes: Change[] = savedSnapshot && savedEntryIds
+        ? describeChanges(portfolio, entryIds, savedSnapshot, savedEntryIds)
+        : [];
+    const changesBySection = (section: ChangeSection) => changes.filter(change => change.section === section);
+
     const isDirty = saveFailed || (savedSnapshot !== null && !deepEqual(portfolio, savedSnapshot));
 
     useEffect(() => {
@@ -423,6 +489,7 @@ const PortfolioEditor: React.FC = () => {
             if (failed.length === 0) {
                 // Only now does the on-screen state match what is in R2.
                 setSavedSnapshot(portfolio);
+                setSavedEntryIds(entryIds);
                 setSaveFailed(false);
                 setMigration(null);
                 setToast({ id: Date.now(), message: 'Portfolio saved' });
@@ -454,7 +521,38 @@ const PortfolioEditor: React.FC = () => {
                     <div className="flex justify-between items-center">
                         <h1 className="text-3xl font-bold">Portfolio Editor</h1>
                         <div className="flex items-center gap-4">
-                            {isDirty && (
+                            {changes.length > 0 && (
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowChanges(open => !open)}
+                                        aria-expanded={showChanges}
+                                        className="flex items-center gap-2 rounded-full border border-amber-200 px-3 py-1 text-sm text-amber-800 tabular-nums transition-colors hover:bg-amber-50"
+                                    >
+                                        {changes.length === 1 ? '1 unsaved change' : `${changes.length} unsaved changes`}
+                                        <ChevronDown className={`w-3 h-3 transition-transform ${showChanges ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {showChanges && (
+                                        <div className="absolute right-0 top-full z-30 mt-2 min-w-[17rem] rounded-lg border border-rule bg-paper p-4 text-left shadow-xl">
+                                            <h3 className="mb-2 text-[10.5px] font-bold uppercase tracking-widest text-ink-faint">
+                                                Not yet published
+                                            </h3>
+                                            <ul className="flex flex-col gap-2">
+                                                {changes.map((change, index) => (
+                                                    <li key={index} className="flex items-start gap-2 text-sm text-ink-muted">
+                                                        <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${DOT[change.kind]}`} />
+                                                        {labelFor(change)}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {/* Still says so when a failed save left the bucket mixed with
+                                nothing pending, which is exactly when the count is zero. */}
+                            {changes.length === 0 && isDirty && (
                                 <span className="text-sm text-amber-800">Unsaved changes</span>
                             )}
                             {!isDirty && migration && (
@@ -536,7 +634,10 @@ const PortfolioEditor: React.FC = () => {
                             {/* Personal Info Section */}
                             <section className="mb-8">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold">Personal Information</h2>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-2xl font-bold">Personal Information</h2>
+                                        <SectionBadge changes={changesBySection('personalInfo')} />
+                                    </div>
                                 </div>
 
                                 <PersonalInfoCard
@@ -548,7 +649,10 @@ const PortfolioEditor: React.FC = () => {
                             {/* Experience Section */}
                             <section className="mb-8">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold">Experience</h2>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-2xl font-bold">Experience</h2>
+                                        <SectionBadge changes={changesBySection('experiences')} />
+                                    </div>
                                     <button
                                         ref={addOrganisationRef}
                                         onClick={() => setOrganisationDialog({ isOpen: true })}
@@ -561,6 +665,7 @@ const PortfolioEditor: React.FC = () => {
 
                                 <DraggableList
                                     items={portfolio.experiences}
+                                    keys={entryIds.experiences}
                                     onReorder={handleReorderOrganisations}
                                     renderItem={(organisation, index, dragHandleProps) => (
                                         <OrganisationCard
@@ -576,7 +681,10 @@ const PortfolioEditor: React.FC = () => {
                             {/* Projects Section */}
                             <section className="mb-8">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold">Projects</h2>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-2xl font-bold">Projects</h2>
+                                        <SectionBadge changes={changesBySection('projects')} />
+                                    </div>
                                     <button
                                         ref={addProjectRef}
                                         onClick={() => setProjectDialog({ isOpen: true })}
@@ -589,6 +697,7 @@ const PortfolioEditor: React.FC = () => {
 
                                 <DraggableList
                                     items={portfolio.projects}
+                                    keys={entryIds.projects}
                                     onReorder={handleReorderProjects}
                                     renderItem={(project, index, dragHandleProps) => (
                                         <ProjectCard
@@ -604,7 +713,10 @@ const PortfolioEditor: React.FC = () => {
                             {/* Education Section */}
                             <section className="mb-8">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold">Education</h2>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-2xl font-bold">Education</h2>
+                                        <SectionBadge changes={changesBySection('education')} />
+                                    </div>
                                     <button
                                         ref={addEducationRef}
                                         onClick={() => setEducationDialog({ isOpen: true })}
@@ -617,6 +729,7 @@ const PortfolioEditor: React.FC = () => {
                                 
                                 <DraggableList
                                     items={portfolio.education}
+                                    keys={entryIds.education}
                                     onReorder={handleReorderEducation}
                                     renderItem={(education, index, dragHandleProps) => (
                                         <EducationCard
