@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { uploadFileToR2 } from '../func/data';
+import { useConfirm } from '../func/confirmContext';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, PROFILE_PICTURE_PATH, R2_PROFILE_PICTURE } from '../constants/app';
 
 type Status =
@@ -29,6 +30,7 @@ const ProfilePictureField: React.FC<{
     value?: string;
     onChange: (url: string) => void;
 }> = ({ value, onChange }) => {
+    const confirm = useConfirm();
     const [status, setStatus] = useState<Status>({ state: 'idle' });
     // Only the newest upload may write state, so a slow one landing after a
     // newer replacement cannot put the older photo's URL back.
@@ -37,6 +39,26 @@ const ProfilePictureField: React.FC<{
     const isUploading = status.state === 'uploading';
 
     const handleFile = async (file: File) => {
+        /*
+         * Unconditional, unlike the other two upload fields. The key never
+         * changes, so there is always a photo at it to destroy -- an unset field
+         * means the photo predates the field, not that the bucket is empty. The
+         * bucket has no versioning and the worker no DELETE, so this is the last
+         * moment the old photo exists.
+         */
+        const confirmed = await confirm({
+            title: 'Replace the profile photo?',
+            body: (
+                <p>
+                    The new file overwrites the old one in the bucket as soon as it uploads. There is
+                    no version to restore, and discarding this dialog will not bring the old photo
+                    back — it only leaves the site linking the previous URL.
+                </p>
+            ),
+            confirmLabel: 'Replace photo'
+        });
+        if (!confirmed) return;
+
         const ticket = ++latestUpload.current;
         setStatus({ state: 'uploading' });
 

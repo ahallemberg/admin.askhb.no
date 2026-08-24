@@ -7,6 +7,7 @@ import OrganisationPreview from "./preview/OrganisationPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import ImageUploadField from "./ImageUploadField";
 import { deepEqual } from "../func/compare";
+import { useConfirm } from "../func/confirmContext";
 import { spanOf } from "../func/organisations";
 import { formatDateRange } from "../func/dates";
 import { LOGO_DIR } from "../constants/app";
@@ -58,6 +59,7 @@ const OrganisationDialog: React.FC<{
     onClose: () => void;
     onSave: (organisation: Organisation) => void;
 }> = ({ organisation, isOpen, isEditing, publishedPages, pagesLoadFailed, onClose, onSave }) => {
+    const confirm = useConfirm();
     // Split in two so the keyed role list is the single source of role order. Holding
     // roles inside the organisation object as well would leave two copies to keep in
     // step, and the stale one would eventually win.
@@ -114,10 +116,14 @@ const OrganisationDialog: React.FC<{
     // Closing discards the draft outright, so confirm first when there is one.
     // Compared against `current` rather than `derived`: an organisation whose stored
     // date disagrees with its roles would otherwise prompt on an untouched dialog.
-    const handleClose = () => {
+    const handleClose = async () => {
         const hasDraft = !deepEqual(current, organisation)
             || Object.values(newSkills).some(value => value.trim() !== '');
-        if (hasDraft && !window.confirm('Discard changes to this organisation?')) {
+        if (hasDraft && !(await confirm({
+            title: 'Discard changes to this organisation?',
+            body: <p>The edits in this dialog are thrown away. Nothing on askhb.no changes either way.</p>,
+            confirmLabel: 'Discard changes'
+        }))) {
             return;
         }
         onClose();
@@ -269,7 +275,20 @@ const OrganisationDialog: React.FC<{
                                 onChange={(role) => updateRole(entry.id, role)}
                                 onNewSkillChange={(value) => setNewSkills(prev => ({ ...prev, [entry.id]: value }))}
                                 onMove={(delta) => moveRole(entry.id, delta)}
-                                onRemove={() => removeRole(entry.id)}
+                                onRemove={async () => {
+                                    const title = entry.role.title.trim();
+                                    const confirmed = await confirm({
+                                        title: title ? `Remove the role “${title}”?` : 'Remove this role?',
+                                        body: (
+                                            <p>
+                                                Its dates, description and skills go with it. Cancelling this
+                                                dialog would undo the removal too.
+                                            </p>
+                                        ),
+                                        confirmLabel: 'Remove role'
+                                    });
+                                    if (confirmed) removeRole(entry.id);
+                                }}
                             />
                         ))}
                     </div>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import PortfolioEditor from './pages/PortfolioEditor'
+import ConfirmProvider from './components/ConfirmProvider'
 
 function App() {
     useEffect(() => {
@@ -7,7 +8,9 @@ function App() {
     }, [])
     
     return (
-        <PortfolioEditor />
+        <ConfirmProvider>
+            <PortfolioEditor />
+        </ConfirmProvider>
     )
 };
 

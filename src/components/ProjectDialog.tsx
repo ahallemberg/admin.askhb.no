@@ -6,6 +6,7 @@ import ImageUploadField from "./ImageUploadField";
 import ProjectPreview from "./preview/ProjectPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
+import { useConfirm } from "../func/confirmContext";
 import { SCREENSHOT_DIR } from "../constants/app";
 
 const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
@@ -22,6 +23,7 @@ const ProjectDialog: React.FC<{
     onClose: () => void;
     onSave: (project: ProjectItem) => void;
 }> = ({ project, isOpen, isEditing, onClose, onSave }) => {
+    const confirm = useConfirm();
     const [draft, setDraft] = useState<ProjectItem>(project);
     // A skill typed but not yet added lives only here, so handleClose has to know
     // about it or closing would drop it without a word.
@@ -44,9 +46,13 @@ const ProjectDialog: React.FC<{
         update({ skills: next.length > 0 ? next : undefined });
     };
 
-    const handleClose = () => {
+    const handleClose = async () => {
         const hasDraft = !deepEqual(draft, project) || newSkill.trim() !== '';
-        if (hasDraft && !window.confirm('Discard changes to this project?')) {
+        if (hasDraft && !(await confirm({
+            title: 'Discard changes to this project?',
+            body: <p>The edits in this dialog are thrown away. Nothing on askhb.no changes either way.</p>,
+            confirmLabel: 'Discard changes'
+        }))) {
             return;
         }
         onClose();

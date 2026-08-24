@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Save } from 'lucide-react';
 import EducationCard from '../components/EducationCard';
 import EducationDialog from '../components/EducationDialog';
@@ -16,6 +16,9 @@ import { normaliseDate } from '../func/dates';
 import { groupExperiences, isOrganisationArray } from '../func/organisations';
 import { fetchPublishedPages, type PublishedPage } from '../func/pages';
 import { deepEqual } from '../func/compare';
+import { useConfirm } from '../func/confirmContext';
+import Toast from '../components/Toast';
+import Notice from '../components/Notice';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH, PROJECTS_PATH } from '../constants/app';
 
 
@@ -58,6 +61,15 @@ const describeMigration = ({ reformatted, structured, regrouped }: { reformatted
 };
 
 const PortfolioEditor: React.FC = () => {
+    const confirm = useConfirm();
+
+    // Where focus goes after a confirmed delete: the button that asked is inside
+    // the card that just disappeared, so without these focus would fall to the
+    // document and the next Tab would restart at the top of the page.
+    const addOrganisationRef = useRef<HTMLButtonElement>(null);
+    const addProjectRef = useRef<HTMLButtonElement>(null);
+    const addEducationRef = useRef<HTMLButtonElement>(null);
+
     const [portfolio, setPortfolio] = useState<PortfolioData>({
         personalInfo: { name: '', title: '', about: '' },
         experiences: [],
@@ -80,6 +92,15 @@ const PortfolioEditor: React.FC = () => {
     // editor must keep saying so rather than looking clean because nothing changed.
     const [saveFailed, setSaveFailed] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    // The transient acknowledgement of a save that worked. Carries an id because
+    // two saves in quick succession produce the same text, and a key that repeats
+    // would leave the second toast inheriting the tail of the first one's timer.
+    const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+    // The failure that has to outlive a glance: a partial save leaves askhb.no
+    // serving a mix, and nothing here can un-publish the half that landed.
+    const [saveError, setSaveError] = useState<{ kind: 'partial' | 'total'; failed: string[] } | null>(null);
+    // Stable, so Toast's dismissal timer is not restarted by unrelated renders.
+    const dismissToast = useCallback(() => setToast(null), []);
     // What load-time normalisation changed, if anything. Kept separate from isDirty:
     // folding it in would light that indicator on every load and train the user to
     // ignore it, but leaving it unsaid hides a bucket-wide rewrite until some
@@ -210,7 +231,24 @@ const PortfolioEditor: React.FC = () => {
         }));
     };
 
-    const handleDeleteOrganisation = (index: number) => {
+    const handleDeleteOrganisation = async (index: number) => {
+        const organisation = portfolio.experiences[index];
+        const roles = organisation.roles.length;
+        const name = organisation.company.trim();
+
+        const confirmed = await confirm({
+            title: name ? `Delete \u201c${name}\u201d?` : 'Delete this organisation?',
+            body: (
+                <p>
+                    This removes the organisation and {plural(roles, 'role', 'roles')} from the
+                    draft. Nothing changes on askhb.no until you save.
+                </p>
+            ),
+            confirmLabel: 'Delete',
+            fallbackFocus: () => addOrganisationRef.current
+        });
+        if (!confirmed) return;
+
         setPortfolio(prev => ({
             ...prev,
             experiences: prev.experiences.filter((_, i) => i !== index)
@@ -234,7 +272,17 @@ const PortfolioEditor: React.FC = () => {
         }));
     };
 
-    const handleDeleteProject = (index: number) => {
+    const handleDeleteProject = async (index: number) => {
+        const name = portfolio.projects[index].name.trim();
+
+        const confirmed = await confirm({
+            title: name ? `Delete \u201c${name}\u201d?` : 'Delete this project?',
+            body: <p>This removes the project from the draft. Nothing changes on askhb.no until you save.</p>,
+            confirmLabel: 'Delete',
+            fallbackFocus: () => addProjectRef.current
+        });
+        if (!confirmed) return;
+
         setPortfolio(prev => ({
             ...prev,
             projects: prev.projects.filter((_, i) => i !== index)
@@ -258,7 +306,18 @@ const PortfolioEditor: React.FC = () => {
         }));
     };
     
-    const handleDeleteEducation = (index: number) => {
+    const handleDeleteEducation = async (index: number) => {
+        const entry = portfolio.education[index];
+        const name = entry.degree.trim() || entry.institution.trim();
+
+        const confirmed = await confirm({
+            title: name ? `Delete \u201c${name}\u201d?` : 'Delete this education entry?',
+            body: <p>This removes the entry from the draft. Nothing changes on askhb.no until you save.</p>,
+            confirmLabel: 'Delete',
+            fallbackFocus: () => addEducationRef.current
+        });
+        if (!confirmed) return;
+
         setPortfolio(prev => ({
             ...prev,
             education: prev.education.filter((_, i) => i !== index)
@@ -300,7 +359,34 @@ const PortfolioEditor: React.FC = () => {
         if (isSaving) {
             return;
         }
+
+        /*
+         * The one save that rewrites content the author never edited: the first
+         * one after a load-time migration reformats dates and regroups every
+         * experience across the whole bucket. describeMigration already spells out
+         * exactly what that will do, so the prompt says it rather than paraphrasing.
+         */
+        if (migration) {
+            const confirmed = await confirm({
+                title: 'Save the date migration too?',
+                body: (
+                    <>
+                        <p>Saving rewrites entries you have not edited: {describeMigration(migration)}.</p>
+                        <p className="mt-2">
+                            This brings the bucket into the shape the editor already reads, and only
+                            happens once. The bucket keeps no versions, so the old strings are gone
+                            afterwards.
+                        </p>
+                    </>
+                ),
+                confirmLabel: 'Save',
+                tone: 'warning'
+            });
+            if (!confirmed) return;
+        }
+
         setIsSaving(true);
+        setSaveError(null);
 
         try {
             const headers = {
@@ -339,20 +425,20 @@ const PortfolioEditor: React.FC = () => {
                 setSavedSnapshot(portfolio);
                 setSaveFailed(false);
                 setMigration(null);
-                alert('Portfolio saved successfully!');
+                setToast({ id: Date.now(), message: 'Portfolio saved' });
                 console.log('All files saved successfully');
             } else {
                 // The four PUTs are independent with no rollback, so a partial failure
                 // leaves R2 in a mixed state. Name the files so it is recoverable.
                 setSaveFailed(true);
-                alert(`Failed to save: ${failed.join(', ')}. R2 is now in a mixed state — fix the problem and save again.`);
+                setSaveError({ kind: 'partial', failed });
                 console.error('Some saves failed:', failed, results);
             }
         } catch (error) {
             // allSettled above means only a non-network bug reaches here, but a save
             // that ended this way is still not a save that succeeded.
             setSaveFailed(true);
-            alert('Failed to save portfolio. Please check your connection.');
+            setSaveError({ kind: 'total', failed: [] });
             console.error('Save error:', error);
         } finally {
             setIsSaving(false);
@@ -394,6 +480,32 @@ const PortfolioEditor: React.FC = () => {
                         </div>
                     </div>
                 </header>
+
+                {saveError && (
+                    <div className="mb-6">
+                        <Notice
+                            tone="error"
+                            action={{ label: 'Retry', onClick: savePortfolio }}
+                            onDismiss={() => setSaveError(null)}
+                        >
+                            {saveError.kind === 'partial' ? (
+                                <>
+                                    <strong className="font-semibold">
+                                        Saved {4 - saveError.failed.length} of 4 files.
+                                    </strong>{' '}
+                                    {saveError.failed.join(' and ')} failed — askhb.no is serving a mix
+                                    of old and new until you save again.
+                                </>
+                            ) : (
+                                <>
+                                    <strong className="font-semibold">Nothing was saved.</strong>{' '}
+                                    The bucket could not be reached, so askhb.no is unchanged. Check
+                                    your connection and try again.
+                                </>
+                            )}
+                        </Notice>
+                    </div>
+                )}
 
                 {/* Loading State */}
                 {isLoading && (
@@ -438,6 +550,7 @@ const PortfolioEditor: React.FC = () => {
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-2xl font-bold">Experience</h2>
                                     <button
+                                        ref={addOrganisationRef}
                                         onClick={() => setOrganisationDialog({ isOpen: true })}
                                         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
                                     >
@@ -465,6 +578,7 @@ const PortfolioEditor: React.FC = () => {
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-2xl font-bold">Projects</h2>
                                     <button
+                                        ref={addProjectRef}
                                         onClick={() => setProjectDialog({ isOpen: true })}
                                         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
                                     >
@@ -492,6 +606,7 @@ const PortfolioEditor: React.FC = () => {
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-2xl font-bold">Education</h2>
                                     <button
+                                        ref={addEducationRef}
                                         onClick={() => setEducationDialog({ isOpen: true })}
                                         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
                                     >
@@ -576,6 +691,10 @@ const PortfolioEditor: React.FC = () => {
                     </>
                 )}
             </div>
+
+            {toast && (
+                <Toast key={toast.id} message={toast.message} onDismiss={dismissToast} />
+            )}
         </div>
     );
 };
