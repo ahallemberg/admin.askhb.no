@@ -5,6 +5,7 @@ import EditorDialog from "./EditorDialog";
 import EducationPreview from "./preview/EducationPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
+import { useConfirm } from "../func/confirmContext";
 import DateRangePicker from "./DateRangePicker";
 import { formatDateRange } from "../func/dates";
 
@@ -17,6 +18,7 @@ const EducationDialog: React.FC<{
     onClose: () => void;
     onSave: (education: EducationItem) => void;
 }> = ({ education, isOpen, isEditing, onClose, onSave }) => {
+    const confirm = useConfirm();
     const [tempItem, setTempItem] = useState(education);
 
     // dateRange is the source of truth; `date` is derived from it so the two cannot
@@ -49,8 +51,12 @@ const EducationDialog: React.FC<{
     };
     
     // Closing discards the draft outright, so confirm first when there is one.
-    const handleClose = () => {
-        if (!deepEqual(tempItem, education) && !window.confirm('Discard changes to this entry?')) {
+    const handleClose = async () => {
+        if (!deepEqual(tempItem, education) && !(await confirm({
+            title: 'Discard changes to this entry?',
+            body: <p>The edits in this dialog are thrown away. Nothing on askhb.no changes either way.</p>,
+            confirmLabel: 'Discard changes'
+        }))) {
             return;
         }
         onClose();

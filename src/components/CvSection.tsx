@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { PersonalInfo } from "../types/props";
 import { Upload, FileText, Trash2 } from 'lucide-react';
 import { uploadFileToR2 } from '../func/data';
+import { useConfirm } from '../func/confirmContext';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, CV_PATH } from '../constants/app';
 
 type Status =
@@ -14,6 +15,7 @@ const CvSection: React.FC<{
     personalInfo: PersonalInfo;
     onUpdate: (field: keyof PersonalInfo, value: string) => void;
 }> = ({ personalInfo, onUpdate }) => {
+    const confirm = useConfirm();
     const [status, setStatus] = useState<Status>({ state: 'idle' });
     const fileInputRef = useRef<HTMLInputElement>(null);
     // Every upload takes a ticket. Only the newest one is allowed to write state,
@@ -25,6 +27,23 @@ const CvSection: React.FC<{
     const hasCv = !!personalInfo.cvUrl;
 
     const handleFile = async (file: File) => {
+        // Only when one is already linked. The first upload creates the object;
+        // every later one overwrites the same key, and there is no way back.
+        if (hasCv) {
+            const confirmed = await confirm({
+                title: 'Replace the CV?',
+                body: (
+                    <p>
+                        The new PDF overwrites the current one in the bucket as soon as it uploads,
+                        and goes live immediately — the link on askhb.no already points at that key.
+                        There is no version to restore.
+                    </p>
+                ),
+                confirmLabel: 'Replace CV'
+            });
+            if (!confirmed) return;
+        }
+
         const ticket = ++latestUpload.current;
         setStatus({ state: 'uploading' });
 
@@ -53,7 +72,27 @@ const CvSection: React.FC<{
         }
     };
 
-    const handleRemove = () => {
+    const handleRemove = async () => {
+        /*
+         * Confirmed even though it destroys nothing: the PDF stays in the bucket
+         * and stays reachable at its URL. What it has that the other remove
+         * buttons do not is nowhere to undo it. This one sits on the page rather
+         * than inside a dialog, so there is no Cancel to back out of, and the
+         * portfolio hides its download button the moment the link goes.
+         */
+        const confirmed = await confirm({
+            title: 'Remove the CV from the portfolio?',
+            body: (
+                <p>
+                    askhb.no stops showing its download button. The PDF itself stays in the bucket
+                    and anyone holding its URL can still reach it — the worker has no way to delete
+                    it. Restoring the link means uploading the file again.
+                </p>
+            ),
+            confirmLabel: 'Remove CV'
+        });
+        if (!confirmed) return;
+
         // Invalidate any upload still in flight, otherwise it would set cvUrl again
         // when it lands and undo this.
         latestUpload.current++;

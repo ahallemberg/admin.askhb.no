@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Upload, X } from 'lucide-react';
 import { uploadFileToR2 } from '../func/data';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT } from '../constants/app';
+import { useConfirm } from '../func/confirmContext';
 import { keyFor } from '../func/keys';
 
 const ImageUploadField: React.FC<{
@@ -16,6 +17,7 @@ const ImageUploadField: React.FC<{
     ownerLabel: string;
     onChange: (url: string | undefined) => void;
 }> = ({ label, value, dir, owner, ownerLabel, onChange }) => {
+    const confirm = useConfirm();
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Only the newest upload may write state. A slow one landing after the user
@@ -28,7 +30,34 @@ const ImageUploadField: React.FC<{
     // other degenerate case, but it cannot invent a difference that is not there.
     const canUpload = owner.trim() !== '';
 
+    /*
+     * Whether picking this file destroys the object the field currently points at.
+     * Only a key collision does: a different filename for the same owner writes a
+     * new object and leaves the old one reachable, so prompting there would be
+     * asking about a loss that is not happening.
+     *
+     * Compared without the query, because the stored url carries a cache buster
+     * and the object path is the part that decides what gets overwritten.
+     */
+    const overwritesCurrent = (file: File) =>
+        !!value && value.split('?')[0] === `${R2_GET_ENDPOINT}${keyFor(dir, owner, file)}`;
+
     const handleFile = async (file: File) => {
+        if (overwritesCurrent(file)) {
+            const confirmed = await confirm({
+                title: 'Replace this image?',
+                body: (
+                    <p>
+                        The new file has the same name, so it overwrites the current one in the
+                        bucket as soon as it uploads. There is no version to restore, and cancelling
+                        this dialog will not bring the old image back.
+                    </p>
+                ),
+                confirmLabel: 'Replace image'
+            });
+            if (!confirmed) return;
+        }
+
         const ticket = ++ticketRef.current;
         setIsUploading(true);
         setError(null);

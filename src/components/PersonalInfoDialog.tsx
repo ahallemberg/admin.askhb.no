@@ -5,6 +5,7 @@ import PersonalInfoPreview from "./preview/PersonalInfoPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import ProfilePictureField from "./ProfilePictureField";
 import { deepEqual } from "../func/compare";
+import { useConfirm } from "../func/confirmContext";
 
 const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
@@ -32,12 +33,13 @@ const PersonalInfoDialog: React.FC<{
     onClose: () => void;
     onSave: (fields: EditableFields) => void;
 }> = ({ personalInfo, isOpen, onClose, onSave }) => {
+    const confirm = useConfirm();
     const [draft, setDraft] = useState<EditableFields>(editableFieldsOf(personalInfo));
 
     const update = (patch: Partial<EditableFields>) => setDraft(prev => ({ ...prev, ...patch }));
 
     // Closing discards the draft outright, so confirm first when there is one.
-    const handleClose = () => {
+    const handleClose = async () => {
         if (deepEqual(draft, editableFieldsOf(personalInfo))) {
             onClose();
             return;
@@ -51,11 +53,15 @@ const PersonalInfoDialog: React.FC<{
          * because "discard" is otherwise read as "undo".
          */
         const photoReplaced = draft.profilePictureUrl !== personalInfo.profilePictureUrl;
-        const message = photoReplaced
-            ? 'Discard changes? The new photo is already in the bucket, so this will not bring the old one back — it only leaves the site linking the previous URL.'
-            : 'Discard changes to your personal information?';
+        const body = photoReplaced
+            ? <p>The new photo is already in the bucket, so this will not bring the old one back — it only leaves the site linking the previous URL.</p>
+            : <p>The edits in this dialog are thrown away. Nothing on askhb.no changes either way.</p>;
 
-        if (!window.confirm(message)) return;
+        if (!(await confirm({
+            title: photoReplaced ? 'Discard changes?' : 'Discard changes to your personal information?',
+            body,
+            confirmLabel: 'Discard changes'
+        }))) return;
         onClose();
     };
 
