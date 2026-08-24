@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { ProjectItem } from "../types/props";
-import { X } from "lucide-react";
 import EditorDialog from "./EditorDialog";
 import ImageUploadField from "./ImageUploadField";
 import ScreenshotCapture from "./ScreenshotCapture";
+import SkillsEditor from "./SkillsEditor";
 import ProjectPreview from "./preview/ProjectPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
@@ -33,19 +33,6 @@ const ProjectDialog: React.FC<{
     const update = (patch: Partial<ProjectItem>) => setDraft(prev => ({ ...prev, ...patch }));
 
     const skills = draft.skills ?? [];
-
-    const addSkill = () => {
-        if (newSkill && !skills.includes(newSkill)) {
-            update({ skills: [...skills, newSkill] });
-            setNewSkill('');
-        }
-    };
-
-    const removeSkill = (index: number) => {
-        const next = skills.filter((_, i) => i !== index);
-        // Absent rather than [], so an emptied list leaves no "skills": [] in the JSON.
-        update({ skills: next.length > 0 ? next : undefined });
-    };
 
     const handleClose = async () => {
         const hasDraft = !deepEqual(draft, project) || newSkill.trim() !== '';
@@ -168,43 +155,14 @@ const ProjectDialog: React.FC<{
                     </p>
                 )}
 
-                <div>
-                    <label className="block text-sm font-medium text-ink-muted mb-3">Skills (optional)</label>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                        {skills.map((skill, index) => (
-                            <span
-                                key={index}
-                                className="inline-flex items-center gap-2 bg-rule rounded-full px-3 py-1 text-sm font-semibold text-ink-muted"
-                            >
-                                {skill}
-                                <button
-                                    type="button"
-                                    onClick={() => removeSkill(index)}
-                                    className="text-ink-faint hover:text-red-600 transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </span>
-                        ))}
-                    </div>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="Add skill"
-                            value={newSkill}
-                            onChange={(e) => setNewSkill(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && addSkill()}
-                            className={`flex-1 ${FIELD_CLASS}`}
-                        />
-                        <button
-                            type="button"
-                            onClick={addSkill}
-                            className="px-4 py-3 bg-ink text-paper rounded-lg hover:bg-ink-muted transition-colors"
-                        >
-                            Add
-                        </button>
-                    </div>
-                </div>
+                <SkillsEditor
+                    label="Skills (optional)"
+                    skills={skills}
+                    newSkill={newSkill}
+                    onNewSkillChange={setNewSkill}
+                    // Absent rather than [], so an emptied list leaves no "skills": [] in the JSON.
+                    onChange={(next) => update({ skills: next.length > 0 ? next : undefined })}
+                />
             </div>
         </EditorDialog>
     );

@@ -1,7 +1,8 @@
 import type { Role, DateRange, PortfolioLink } from "../types/props";
-import { X, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import DateRangePicker from "./DateRangePicker";
 import LinksEditor from "./LinksEditor";
+import SkillsEditor from "./SkillsEditor";
 import { deriveReadMoreUrl } from "../func/links";
 import type { PublishedPage } from "../func/pages";
 import { formatDateRange } from "../func/dates";
@@ -52,17 +53,6 @@ const RoleEditor: React.FC<{
     // askhb.no build that predates multi-link support still renders something.
     const handleLinksChange = (links: PortfolioLink[]) => {
         onChange({ ...role, links, readMoreUrl: deriveReadMoreUrl(links) });
-    };
-
-    const addSkill = () => {
-        if (newSkill && !role.skills.includes(newSkill)) {
-            onChange({ ...role, skills: [...role.skills, newSkill] });
-            onNewSkillChange('');
-        }
-    };
-
-    const removeSkill = (skillIndex: number) => {
-        onChange({ ...role, skills: role.skills.filter((_, i) => i !== skillIndex) });
     };
 
     return (
@@ -161,46 +151,13 @@ const RoleEditor: React.FC<{
                     onChange={handleLinksChange}
                 />
 
-                <div>
-                    <label className="block text-sm font-medium text-ink-muted mb-3">Skills</label>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                        {role.skills.map((skill, skillIndex) => (
-                            <span
-                                key={skillIndex}
-                                // inline-flex, not the `inline-block … flex` pair the old
-                                // dialog carried: those are two values for `display` and
-                                // which one wins is down to stylesheet order.
-                                className="inline-flex items-center gap-2 bg-rule rounded-full px-3 py-1 text-sm font-semibold text-ink-muted mr-2 mb-2"
-                            >
-                                {skill}
-                                <button
-                                    type="button"
-                                    onClick={() => removeSkill(skillIndex)}
-                                    className="text-ink-faint hover:text-red-600 transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </span>
-                        ))}
-                    </div>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="Add skill"
-                            value={newSkill}
-                            onChange={(e) => onNewSkillChange(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && addSkill()}
-                            className="flex-1 p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors"
-                        />
-                        <button
-                            type="button"
-                            onClick={addSkill}
-                            className="px-4 py-3 bg-ink text-paper rounded-lg hover:bg-ink-muted transition-colors"
-                        >
-                            Add
-                        </button>
-                    </div>
-                </div>
+                <SkillsEditor
+                    label="Skills"
+                    skills={role.skills}
+                    newSkill={newSkill}
+                    onNewSkillChange={onNewSkillChange}
+                    onChange={(skills) => onChange({ ...role, skills })}
+                />
             </div>
         </div>
     );
