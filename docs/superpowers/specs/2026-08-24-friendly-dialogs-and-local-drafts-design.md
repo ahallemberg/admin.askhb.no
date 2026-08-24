@@ -61,6 +61,13 @@ which is why it is a banner and not a toast.
 | `src/func/changes.ts` | Describe the difference between two portfolios as a list of changes. |
 | `src/func/entryIds.ts` | Mint and carry the parallel entry ids. |
 
+Two existing modules change shape rather than gaining a caller:
+
+| File | Change |
+|---|---|
+| `src/func/data.ts` | Gains `loadPortfolio()` — the fetch-and-normalise block lifted out of `PortfolioEditor`'s load effect, so the load and the save-time check cannot drift apart |
+| `src/components/DraggableList.tsx` | Gains a `keys` prop and reorders it alongside `items`, so callers never recover a permutation by object identity |
+
 `confirmContext.ts` is split from the provider because the lint rule that keeps
 fast refresh working objects to a module exporting both a component and a
 non-component.
@@ -175,15 +182,52 @@ be permanently true after a restore. Keeping them outside also means the PUT pat
 needs no stripping step, which matters because that is the path where mistakes
 are unrecoverable.
 
-This mirrors `OrganisationDialog`'s existing `KeyedRole` handling one level up,
-including its reason for minting outside the state updater: StrictMode invokes
-updaters twice and an id generated inside one advances the counter for a value
-React discards.
+Ids are `crypto.randomUUID()`, not a counter. A counter restarts at zero on every
+page load, which would make two independently-minted id spaces *collide* rather
+than be disjoint — and silently degrade id matching into positional matching
+wearing a hat. Stability comes from reusing stored ids, below, never from the
+minting.
 
-The nine handlers that mutate a section array (add, delete, reorder, per section)
-each mutate the matching id array identically. That symmetry is the invariant;
-`entryIds.ts` exposes the operations so it is enforced in one place rather than
-nine.
+**The id space must survive a reload, or the count is wrong on every restore.**
+The load mints ids for `loaded`, so `savedSnapshotIds` would be a fresh space,
+while a restored `entryIds` comes from the envelope's `draftIds` — minted in a
+previous session. Diffing across two unrelated spaces reports every entry as
+deleted-plus-added. This is what the envelope's `baseIds` is for: on the restore
+branch, `savedSnapshotIds[k]` is taken from `baseIds[k]` for every key where
+`base[k]` equals `loaded[k]`, and only a section that genuinely moved gets fresh
+ids. Without that clause `baseIds` is dead weight nothing reads.
+
+**This is deliberately *unlike* `KeyedRole`, and the difference matters.**
+`OrganisationDialog` holds `{ id, role }` pairs in one array, so id and data
+*cannot* desynchronise — there is no alignment to maintain, it is structural.
+`EntryIds` is two arrays kept aligned by discipline, which is a weaker guarantee
+bought for a much smaller diff: pairs would mean deriving `portfolio` at the
+boundary and memoising the derive, since a fresh object per render would fire the
+write effect continuously. The one thing carried over from `KeyedRole` is minting
+outside the state updater, for its original reason: StrictMode invokes updaters
+twice and an id generated inside one is minted for a value React discards.
+
+Because the alignment is maintained rather than structural, the one path that
+cannot maintain it by construction has to be fixed at source. **`DraggableList`
+gains a `keys` prop** and applies its existing splice arithmetic to both arrays,
+calling `onReorder(newItems, newKeys)`. Today it passes only the reordered array,
+so a caller would have to recover the permutation by object identity — which is
+already broken for a reachable case: `ProjectDialog` seeds its draft from the
+frozen module-level `BLANK_PROJECT` and saves that same reference if nothing is
+typed, so adding two blank projects puts one object in two slots and `indexOf`
+returns the same index for both. Three lines in one generic component removes the
+fragility instead of documenting it at nine call sites.
+
+The handlers that mutate a section array mutate the matching id array identically.
+Note the shape: the three `handleSave*` handlers are add-*or*-edit, branching on
+`editIndex`, so they are six operations in three functions — and **the edit branch
+must deliberately leave the id alone.** That is the branch a rename depends on,
+and it is the easiest one to get wrong. `entryIds.ts` exposes the operations so
+the symmetry is enforced in one place.
+
+`entryIds` is React state, not a value derived during render. A fresh object each
+render would put a new identity in the write effect's dependency list and write to
+localStorage continuously.
 
 ### Change description
 
@@ -265,8 +309,22 @@ Writing `base: savedSnapshot` instead makes the warning erase its own evidence:
 6. **The next load compares B against B and says nothing** — while `D` is still
    forked from A.
 
-`draftBase` is assigned in exactly four places and nowhere else: both branches of
-the load, a fully successful save, and Discard. The write effect only reads it.
+`draftBase` is assigned in exactly **five** places and nowhere else: both branches
+of the load, a fully successful save, Discard, and per-key when
+`StaleDraftDialog` resolves a key. The write effect only reads it.
+
+**The fifth site looks like the bug and is its opposite.** Advancing
+`draftBase[k]` to `loaded[k]` when a key is *resolved* is what "resolved" means.
+The rebasing bug was advancing it *without* resolution, which is what made the
+warning go quiet while the danger stood. Without the fifth site the resolver
+deadlocks: it changes `portfolio[k]` and leaves `draftBase[k]` at the old
+`base[k]`, so the save-time check finds a difference, aborts, and the file can
+never be saved — the mechanism that resolves conflicts would be the mechanism
+that makes them unresolvable.
+
+A key left unresolved because the dialog was dismissed does **not** advance. That
+is what keeps `isStale` true after a dismissal and lets it go false once
+everything really is resolved.
 
 The warning is derived, not remembered, so *Keep* needs no acknowledgement flag:
 
@@ -300,6 +358,15 @@ survive untouched. The restore adds to the load rather than changing it.
    - the envelope's `saveFailed` is set — the divergence is the author's own
      half-landed save, not another session. The dialog says so, naming
      `failedFiles`, rather than implying someone else edited the bucket.
+   - **`saveFailed` and `failedFiles` are restored into React state**, not merely
+     read for a string. They are React state and die with the reload, so a load
+     that only reads them leaves the mixed-bucket strip gone, `isDirty` no longer
+     reflecting it, and the next write-effect run recording `saveFailed: false` —
+     permanently erasing the only record that the bucket is mixed. That is the
+     rebasing bug's self-erasing shape one level over.
+   - `savedSnapshotIds[k]` comes from the envelope's `baseIds[k]` wherever
+     `base[k]` equals `loaded[k]`, so the restored draft and the snapshot share
+     one id space.
 4. **The fetch failed — do not touch storage.** The draft waits for a load that
    works.
 
@@ -322,6 +389,9 @@ is already there. For each key:
   changed it and nobody else did. Keep the draft's. No question.
 - both differ — a genuine conflict. Ask.
 
+Every key the dialog resolves — silently or by a choice — advances `draftBase[k]`
+to `loaded[k]`, per the fifth assignment site above.
+
 That turns a four-file scare into at most one real question and removes the
 blanket clobber, where "Keep" would otherwise PUT all four files and destroy
 another session's edits to a file this draft never touched.
@@ -329,9 +399,27 @@ another session's edits to a file this draft never touched.
 This is a bespoke dialog rather than a `useConfirm` caller: it was never a
 boolean, it names files, and it wants a choice per conflict.
 
+**`personalInfo` resolves field-wise, not whole-file.** It is one file with two
+independent owners: `cvUrl` is written by `CvSection`, while `name`, `title`,
+`about` and `profilePictureUrl` are written by `PersonalInfoDialog`. So the
+commonest real conflict — upload a CV on the laptop, edit the About text on the
+phone — hits the both-differ case on fields that do not overlap, and whole-file
+resolution would discard one of two compatible edits. `PersonalInfo` is a flat
+object of five scalars, so the same three-case rule runs per field and the merged
+object is what gets PUT.
+
+This is the same insight `PersonalInfoDialog` already encodes one level down: it
+merges its four fields over the stored object precisely so it cannot write back a
+stale `cvUrl`. The resolver honours the reasoning the dialog already follows.
+
+The three arrays genuinely cannot be merged this way — they are positional, and
+there is no id space shared across sessions to merge on — so whole-file is right
+for them. The asymmetry is a decision, not an oversight.
+
 ### Write
 
-One effect, with dependencies `[portfolio, savedSnapshot, draftBase, entryIds]`:
+One effect, with dependencies
+`[portfolio, savedSnapshot, draftBase, entryIds, saveFailed, failedFiles]`:
 
 - `savedSnapshot` is null (the load has not resolved) — do nothing
 - `portfolio` equals `savedSnapshot` **and `saveFailed` is false** — clear storage
@@ -343,6 +431,15 @@ calls `setSavedSnapshot(portfolio)` with the *same object reference*, so
 not re-run, and storage would never be cleared after a successful save — leaving an
 envelope with a stale `savedAt` and a `base` two states behind. It self-heals on
 the next load, which makes it worse: the bug is invisible in manual testing.
+
+`saveFailed` and `failedFiles` are in the list for the same class of reason, and
+omitting them breaks the clause below outright. A partial failure changes
+**nothing else**: `savedSnapshot` is deliberately not advanced, `portfolio`,
+`draftBase` and `entryIds` are all untouched. Without those two in the list the
+effect does not re-run, the envelope is never rewritten with `saveFailed: true`,
+and every feature resting on it — the load's mixed-bucket branch, its wording, the
+strip — rests on a flag that is never written.
+
 `react-hooks/exhaustive-deps` is active and will demand the full list; do not
 silence it.
 
@@ -393,13 +490,41 @@ If any object differs, the save aborts before the first PUT and reports which
 files, offering the same per-file resolution as `StaleDraftDialog`. Nothing is
 written.
 
-The re-fetch reuses `fetchFromR2` / `fetchFromR2OrDefault` and inherits their
-behaviour, including the narrow 404 fallback for `projects.json`. **A re-fetch that
-fails aborts the save**, on the same reasoning that keeps that fallback narrow: a
-read that did not succeed is not evidence that writing is safe.
+#### It must compare normalised against normalised, or it deadlocks
+
+`draftBase` comes from `loaded`, which is **post-normalisation** —
+`education.map(normaliseDate)` and `groupExperiences` when the file is still flat.
+A raw re-fetch is not that. When a migration is pending, raw and normalised differ
+*by construction* — that difference is precisely what `migration` counts — so the
+check would find a conflict with nobody having touched the bucket, and abort.
+
+And the only way to clear a pending migration is to save. **The save is what is
+blocked.** `PortfolioEditor.tsx:379` already carries a warning against making that
+button unreachable ("the pending date migration is not a user edit, so a
+dirty-gated button would make it permanently unreachable"); a raw comparison
+reintroduces exactly that, by a different route.
+
+So the fetch-and-normalise block is **extracted into one shared function** —
+`loadPortfolio(): Promise<{ loaded: PortfolioData; migration: … }>` — and the load
+effect and the save-time check both call it. Saying "reuses `fetchFromR2`" is not
+enough; naming the shared function is what makes the requirement unmissable.
+
+The comparison is then a fixed point, which holds because every stage is pure and
+idempotent: `normaliseDate` reuses a valid stored `dateRange` and re-derives the
+same string, `groupExperiences` is deterministic and skipped once
+`isOrganisationArray` holds, and `normaliseLinks` is pure.
+
+`loadPortfolio` inherits the narrow 404 fallback for `projects.json`, which is
+correct in the comparison path: the only value it substitutes is the same value
+the original load substituted, so a 404 cannot read as "unchanged" when it should
+not. **A re-fetch that fails aborts the save**, on the same reasoning that keeps
+that fallback narrow — a read that did not succeed is not evidence that writing is
+safe.
 
 Save is not additionally disabled while `isStale`. The check is the gate, and it
-runs against fresh data rather than a possibly hours-old page load.
+runs against fresh data rather than a possibly hours-old page load. `isStale`
+being true means `draftBase` disagrees with the bucket, which is exactly what the
+re-fetch finds.
 
 ### Save feedback
 
@@ -411,8 +536,18 @@ published, so the two agree again.
 Success sets a toast that clears itself after four seconds. Failure sets:
 
 ```ts
-const [saveError, setSaveError] = useState<{ kind: 'partial' | 'total' | 'conflict'; failed: string[] } | null>(null);
+const [saveError, setSaveError] = useState<{
+    kind: 'partial' | 'total' | 'conflict' | 'refetch-failed';
+    failed: string[];
+} | null>(null);
 ```
+
+`refetch-failed` is its own kind because it is none of the others — nothing was
+attempted, so it is not partial; no PUT failed, so it is not total; and there is
+no conflict. **It must not set `saveFailed`.** Routing it through the ordinary
+failure path would persist `saveFailed: true` into the envelope and tell the next
+load the bucket is mixed when nothing was written — a false alarm that survives
+reloads, which is the same self-perpetuating shape as the rebasing bug.
 
 rendered as a banner naming the files, with Retry, dismissed only by the author or
 by a later successful save.
@@ -456,6 +591,17 @@ unavailable.
 
 ## Accepted limitations
 
+**The save-time check narrows the conflict window; it does not close it.** A write
+landing between the re-fetch resolving and the first PUT is missed. Closing that
+properly needs a conditional write — `If-Match` on an ETag, which R2 supports and
+the worker would have to pass through — and worker changes are out of scope. The
+window is sub-second and the competing writer is the same person on another
+device, so this is accepted; it is recorded so a later reader does not mistake the
+check for a guarantee. Relatedly, the re-fetch is four independent GETs, so a
+write landing between them yields a mixed read and the reported file list could
+describe a state that never coherently existed. It fails towards aborting, so it
+is safe.
+
 **Two tabs share one key.** Both write `askhb-admin-draft`, last writer wins, and
 neither knows. Accepted for a single-author tool; recorded so the behaviour is a
 decision rather than a surprise.
@@ -490,22 +636,42 @@ No test framework is configured and none is being added, per `CLAUDE.md`.
   4. Clear an image link and a CV link — no prompt
   5. Open each of the four dialogs, edit, close — the styled discard prompt
      appears; close an untouched dialog and it does not
-  6. Edit, refresh, confirm the draft returns with its age and the change count
-  7. Rename an entry — the count says one edit, not a delete plus an add
-  8. Add two blank entries — the count distinguishes them
-  9. Reorder a section and drop an entry back where it started — only the first
-     counts as a change
-  10. Edit, refresh, Discard — the editor returns to R2 content and a second
+  6. **Save with a migration pending** — a bucket holding a legacy flat
+     `experiences.json`, or education lacking `dateRange`, with nothing else
+     changed. **The save must succeed.** This is the raw-vs-normalised test and
+     it goes first, because failing it means the editor cannot save at all on
+     exactly the data the migration exists for. It is invisible on an
+     already-migrated bucket, so test it against unmigrated data deliberately
+  7. Edit, refresh, confirm the draft returns with its age — **and that the count
+     equals the number of edits actually made.** A count matching the total entry
+     count instead means the id spaces did not survive the reload
+  8. Rename an entry — the count says one edit, not a delete plus an add
+  9. Add two blank entries — the count distinguishes them — **then reorder them
+     and confirm the count still names them correctly.** The reorder is the half
+     that exercises the id alignment
+  10. Reorder a section and drop an entry back where it started — only the first
+      counts as a change
+  11. Edit, refresh, Discard — the editor returns to R2 content and a second
       refresh restores nothing
-  11. Edit in one browser and save; reload another holding a stale draft — only
+  12. Edit in one browser and save; reload another holding a stale draft — only
       genuinely conflicting files are questioned, and untouched ones take the
       bucket's version silently
-  12. **From that state choose Keep, then reload again without saving — the
-      warning must still be there.** Regression test for the rebasing bug
-  13. Load the editor, change a file from another browser, then save — the
+  13. **From that resolution, save — it must succeed**, and a reload afterwards
+      must show no warning. Regression test for `draftBase` advancing on
+      resolution; without it every resolved file is unsaveable forever
+  14. **From that state choose Keep instead, then reload again without saving —
+      the warning must still be there.** Regression test for the rebasing bug
+  15. Upload a CV on one device and edit the About text on another, then reload
+      with both pending — `personalInfo` merges field-wise and neither edit is
+      discarded
+  16. Load the editor, change a file from another browser, then save — the
       save-time check aborts before writing and names the file
-  14. Save successfully — toast appears and fades; **a refresh restores nothing**,
+  17. Save successfully — toast appears and fades; **a refresh restores nothing**,
       which is the regression test for the write effect's dependency list
-  15. Simulate a partial failure, then Discard, then reload — the mixed-bucket
-      warning is still there
-  16. Escape and backdrop clicks cancel a confirm; tab order stays inside it
+  18. Simulate a partial failure, then Discard, then reload — the mixed-bucket
+      warning is still there. Tests both that the envelope records `saveFailed`
+      and that the load restores it into state
+  19. Take the network down mid-save so the re-fetch itself fails — the banner
+      says nothing was written, and a reload does **not** claim the bucket is
+      mixed
+  20. Escape and backdrop clicks cancel a confirm; tab order stays inside it
