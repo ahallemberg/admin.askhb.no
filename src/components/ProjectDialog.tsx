@@ -3,13 +3,14 @@ import type { ProjectItem } from "../types/props";
 import { X } from "lucide-react";
 import EditorDialog from "./EditorDialog";
 import ImageUploadField from "./ImageUploadField";
+import ScreenshotCapture from "./ScreenshotCapture";
 import ProjectPreview from "./preview/ProjectPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
 import { useConfirm } from "../func/confirmContext";
 import { SCREENSHOT_DIR } from "../constants/app";
 
-const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
+const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
 // Optional text is stored absent rather than empty, so a cleared field leaves no
 // `"url": ""` behind for askhb.no to render as a link to nowhere. Same rule as
@@ -83,7 +84,7 @@ const ProjectDialog: React.FC<{
         >
             <div className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Name</label>
                     <input
                         type="text"
                         value={draft.name}
@@ -93,7 +94,7 @@ const ProjectDialog: React.FC<{
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">URL (optional)</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">URL (optional)</label>
                     <input
                         type="text"
                         value={draft.url ?? ''}
@@ -103,13 +104,16 @@ const ProjectDialog: React.FC<{
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Description</label>
                     <textarea
                         value={draft.description}
                         onChange={(e) => update({ description: e.target.value })}
                         rows={5}
                         className={FIELD_CLASS + " resize-none"}
                     />
+                    <p className="mt-1 text-xs text-ink-faint">
+                        Supports [text](https://example.com), **bold** and *italic*.
+                    </p>
                 </div>
 
                 <ImageUploadField
@@ -121,26 +125,40 @@ const ProjectDialog: React.FC<{
                     onChange={(screenshotUrl) => update({ screenshotUrl })}
                 />
 
+                <ScreenshotCapture
+                    url={draft.url}
+                    sourceUrl={draft.screenshotSourceUrl}
+                    onSourceUrlChange={(screenshotSourceUrl) => update({ screenshotSourceUrl })}
+                    owner={draft.name}
+                    light={draft.screenshotUrl}
+                    dark={draft.screenshotUrlDark}
+                    onCaptured={({ light, dark }) => update({
+                        ...(light ? { screenshotUrl: light } : {}),
+                        ...(dark ? { screenshotUrlDark: dark } : {}),
+                    })}
+                    onRemoveDark={() => update({ screenshotUrlDark: undefined })}
+                />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Figure (optional)</label>
+                        <label className="block text-sm font-medium text-ink-muted mb-2">Figure (optional)</label>
                         <input
                             type="text"
                             value={draft.figure ?? ''}
                             onChange={(e) => update({ figure: orUndefined(e.target.value) })}
                             className={FIELD_CLASS}
                         />
-                        <p className="mt-1 text-xs text-gray-500">e.g. "680,000"</p>
+                        <p className="mt-1 text-xs text-ink-faint">e.g. "680,000"</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Figure caption (optional)</label>
+                        <label className="block text-sm font-medium text-ink-muted mb-2">Figure caption (optional)</label>
                         <input
                             type="text"
                             value={draft.figureCaption ?? ''}
                             onChange={(e) => update({ figureCaption: orUndefined(e.target.value) })}
                             className={FIELD_CLASS}
                         />
-                        <p className="mt-1 text-xs text-gray-500">e.g. "page views"</p>
+                        <p className="mt-1 text-xs text-ink-faint">e.g. "page views"</p>
                     </div>
                 </div>
 
@@ -151,18 +169,18 @@ const ProjectDialog: React.FC<{
                 )}
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Skills (optional)</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-3">Skills (optional)</label>
                     <div className="flex flex-wrap gap-2 mb-3">
                         {skills.map((skill, index) => (
                             <span
                                 key={index}
-                                className="inline-flex items-center gap-2 bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700"
+                                className="inline-flex items-center gap-2 bg-rule rounded-full px-3 py-1 text-sm font-semibold text-ink-muted"
                             >
                                 {skill}
                                 <button
                                     type="button"
                                     onClick={() => removeSkill(index)}
-                                    className="text-gray-400 hover:text-red-600 transition-colors"
+                                    className="text-ink-faint hover:text-red-600 transition-colors"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
@@ -181,7 +199,7 @@ const ProjectDialog: React.FC<{
                         <button
                             type="button"
                             onClick={addSkill}
-                            className="px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                            className="px-4 py-3 bg-ink text-paper rounded-lg hover:bg-ink-muted transition-colors"
                         >
                             Add
                         </button>

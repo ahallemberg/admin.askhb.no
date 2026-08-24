@@ -14,20 +14,20 @@ const OrganisationCard: React.FC<{
     onDelete: () => void;
     dragHandleProps?: DragHandleProps;
 }> = ({ organisation, onEdit, onDelete, dragHandleProps }) => (
-    <div className="mb-6 group relative bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <div className="mb-6 group relative bg-paper rounded-lg p-6 shadow-sm border border-rule hover:shadow-md transition-shadow">
         <div
             {...dragHandleProps}
             className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
             title="Drag to reorder"
         >
-            <GripVertical className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+            <GripVertical className="w-5 h-5 text-ink-faint hover:text-ink-muted" />
         </div>
 
         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={onEdit} className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100" title="Edit">
+            <button onClick={onEdit} className="p-2 text-ink-faint hover:text-ink-muted transition-colors rounded-lg hover:bg-rule-faint" title="Edit">
                 <Edit className="w-4 h-4" />
             </button>
-            <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50" title="Delete">
+            <button onClick={onDelete} className="p-2 text-ink-faint hover:text-red-600 transition-colors rounded-lg hover:bg-red-50" title="Delete">
                 <Trash2 className="w-4 h-4" />
             </button>
         </div>
@@ -39,20 +39,20 @@ const OrganisationCard: React.FC<{
                 )}
                 <h3 className="text-xl font-semibold">{organisation.company}</h3>
             </div>
-            <p className="text-gray-600">
+            <p className="text-ink-muted">
                 {[organisation.location, organisation.date, organisation.commitment].filter(Boolean).join(' | ')}
             </p>
 
-            <ol className="mt-3 border-l-2 border-gray-200 pl-4">
+            <ol className="mt-3 border-l-2 border-rule pl-4">
                 {organisation.roles.map((role, index) => {
                     const links = roleLinks(role);
 
                     return (
                         <li key={index} className={index > 0 ? "mt-3" : undefined}>
                             <h4 className="font-semibold">{role.title}</h4>
-                            <p className="text-sm text-gray-500">{role.date}</p>
+                            <p className="text-sm text-ink-faint">{role.date}</p>
                             {role.result && (
-                                <p className="text-sm text-gray-700 mt-1">Result: {role.result}</p>
+                                <p className="text-sm text-ink-muted mt-1">Result: {role.result}</p>
                             )}
                             {links.length > 0 && (
                                 <div className="mt-1 flex flex-wrap gap-x-4">
@@ -63,7 +63,7 @@ const OrganisationCard: React.FC<{
                                             target="_blank"
                                             // These can point anywhere now, not only at pages.askhb.no.
                                             rel="noreferrer"
-                                            className="text-blue-600 hover:text-blue-800 text-sm transition-colors"
+                                            className="text-accent hover:text-ink text-sm transition-colors"
                                         >
                                             {link.label} →
                                         </a>
@@ -72,7 +72,7 @@ const OrganisationCard: React.FC<{
                             )}
                             <div className="mt-1">
                                 {role.skills.map((skill: string, skillIndex: number) => (
-                                    <span key={skillIndex} className="inline-block bg-gray-200 rounded-full px-3 py-1 text-xs font-semibold text-gray-700 mr-2 mb-2">
+                                    <span key={skillIndex} className="inline-block bg-rule rounded-full px-3 py-1 text-xs font-semibold text-ink-muted mr-2 mb-2">
                                         {skill}
                                     </span>
                                 ))}

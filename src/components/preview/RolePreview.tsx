@@ -1,6 +1,7 @@
 import type { Role } from '../../types/props';
 import { splitParagraphs } from '../../func/text';
 import { DEFAULT_LABEL } from '../../func/links';
+import RichTextPreview from './RichTextPreview';
 
 /*
  * Mirrors askhb.no's src/components/RoleBlock.tsx. Restyling that file makes this
@@ -51,7 +52,7 @@ const RolePreview: React.FC<RolePreviewProps> = ({ role, nested = false }) => {
 
             {paragraphs.map((paragraph, index) => (
                 <p key={index} className={`leading-relaxed text-ink-muted ${index > 0 ? 'mt-3' : 'mt-2'}`}>
-                    {paragraph}
+                    <RichTextPreview text={paragraph} />
                 </p>
             ))}
 

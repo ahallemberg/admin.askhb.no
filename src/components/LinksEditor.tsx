@@ -3,7 +3,7 @@ import type { PortfolioLink } from "../types/props";
 import type { PublishedPage } from "../func/pages";
 import { DEFAULT_LABEL } from "../func/links";
 
-const FIELD_CLASS = "p-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
+const FIELD_CLASS = "p-2 border border-rule rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 const CUSTOM = '__custom__';
 
 const LinksEditor: React.FC<{
@@ -26,11 +26,11 @@ const LinksEditor: React.FC<{
     return (
         <div>
             <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-gray-700">Links (optional)</label>
+                <label className="block text-sm font-medium text-ink-muted">Links (optional)</label>
                 <button
                     type="button"
                     onClick={() => onChange([...links, { label: DEFAULT_LABEL, url: '' }])}
-                    className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                    className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors"
                 >
                     <Plus className="w-4 h-4" />
                     Add link
@@ -38,7 +38,7 @@ const LinksEditor: React.FC<{
             </div>
 
             {links.length === 0 && (
-                <p className="text-sm text-gray-500">No links. The entry renders without a “Read more” line.</p>
+                <p className="text-sm text-ink-faint">No links. The entry renders without a “Read more” line.</p>
             )}
 
             <div className="space-y-3">
@@ -49,7 +49,7 @@ const LinksEditor: React.FC<{
                     const selection = matched ? matched.url : CUSTOM;
 
                     return (
-                        <div key={index} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                        <div key={index} className="border border-rule rounded-lg p-3 space-y-2">
                             <div className="flex gap-2">
                                 <input
                                     type="text"
@@ -77,7 +77,7 @@ const LinksEditor: React.FC<{
                                         onClick={() => move(index, -1)}
                                         disabled={index === 0}
                                         title="Move up"
-                                        className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                                        className="p-2 text-ink-faint hover:text-ink-muted disabled:opacity-30 disabled:hover:text-ink-faint transition-colors"
                                     >
                                         <ChevronUp className="w-4 h-4" />
                                     </button>
@@ -86,7 +86,7 @@ const LinksEditor: React.FC<{
                                         onClick={() => move(index, 1)}
                                         disabled={index === links.length - 1}
                                         title="Move down"
-                                        className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                                        className="p-2 text-ink-faint hover:text-ink-muted disabled:opacity-30 disabled:hover:text-ink-faint transition-colors"
                                     >
                                         <ChevronDown className="w-4 h-4" />
                                     </button>
@@ -94,7 +94,7 @@ const LinksEditor: React.FC<{
                                         type="button"
                                         onClick={() => onChange(links.filter((_, i) => i !== index))}
                                         title="Remove link"
-                                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                        className="p-2 text-ink-faint hover:text-red-600 transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -121,7 +121,7 @@ const LinksEditor: React.FC<{
                 </p>
             )}
             {links.length > 1 && (
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-ink-faint">
                     The first link is also written to <code>readMoreUrl</code>, which is what an askhb.no build without multi-link support shows.
                 </p>
             )}

@@ -3,64 +3,7 @@ import { Upload, X } from 'lucide-react';
 import { uploadFileToR2 } from '../func/data';
 import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT } from '../constants/app';
 import { useConfirm } from '../func/confirmContext';
-
-// Nordic letters carry meaning that stripping them loses, and unlike é they do not
-// decompose under NFD — "Bærum" and "Barum" are different places. Transliterated
-// before the diacritic strip so they survive as ae/oe/aa.
-const NORDIC: Record<string, string> = { 'æ': 'ae', 'ø': 'oe', 'å': 'aa' };
-
-const slugify = (name: string) => name
-    .toLowerCase()
-    .replace(/[æøå]/g, character => NORDIC[character])
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    // Long enough to stay readable in the R2 browser, short enough that a rambling
-    // name cannot push the key toward a length limit.
-    .slice(0, 40);
-
-// Distinguishes entries the slug alone cannot: "Q-Free" and "Q Free" slugify alike,
-// and a name with no ASCII in it slugifies to nothing at all. FNV-1a over the raw
-// name, so it is stable across sessions — the same entry always lands on the same
-// prefix — while two distinct names practically never share one.
-const fingerprint = (name: string) => {
-    let hash = 2166136261;
-    for (let index = 0; index < name.length; index++) {
-        hash ^= name.charCodeAt(index);
-        hash = Math.imul(hash, 16777619);
-    }
-    return (hash >>> 0).toString(36);
-};
-
-// `..` is the one sanitised filename that would still mean something to a URL
-// resolver: `/logos/x/..` normalises to `/logos/`, putting the PUT somewhere other
-// than the key we computed. Dots are otherwise allowed, so they are collapsed rather
-// than dropped, and a name that survives as nothing gets a placeholder.
-const safeFileName = (name: string) => {
-    const cleaned = name
-        .toLowerCase()
-        .replace(/[^a-z0-9.]+/g, '-')
-        .replace(/\.{2,}/g, '.')
-        .replace(/^\.+/, '');
-    return cleaned === '' ? 'file' : cleaned;
-};
-
-// The key is the owning entry's name plus the filename, so re-uploading the same
-// asset for the same entry overwrites in place rather than littering a bucket the
-// worker cannot delete from — while two different entries can never share a key.
-// That last part is what stops Cancel from destroying someone else's logo: the file
-// is already in R2 by the time the dialog asks whether to discard, and a
-// filename-only key meant every entry's `logo.png` was the same object.
-//
-// Renaming an entry leaves its stored URL pointing at the old key. That is accepted:
-// the URL keeps working (the object is untouched and R2 serves it as before), and a
-// re-upload after the rename writes to the new prefix, orphaning at most one object
-// in a bucket that already accumulates them. What it cannot do is overwrite another
-// entry's asset, which is the failure worth preventing.
-const keyFor = (dir: string, owner: string, file: File) => {
-    const slug = slugify(owner);
-    return `${dir}${slug ? slug + '-' : ''}${fingerprint(owner)}/${safeFileName(file.name)}`;
-};
+import { keyFor } from '../func/keys';
 
 const ImageUploadField: React.FC<{
     label: string;
@@ -150,12 +93,12 @@ const ImageUploadField: React.FC<{
 
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <label className="block text-sm font-medium text-ink-muted mb-1">{label}</label>
             <div className="flex items-center gap-3">
-                {value && <img src={value} alt="" className="w-10 h-10 object-contain border border-gray-200 rounded" />}
+                {value && <img src={value} alt="" className="w-10 h-10 object-contain border border-rule rounded" />}
                 <label
-                    className={`flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg transition-colors ${
-                        canUpload ? 'cursor-pointer hover:bg-gray-50' : 'opacity-40 cursor-not-allowed'
+                    className={`flex items-center gap-2 px-3 py-2 border border-rule rounded-lg transition-colors ${
+                        canUpload ? 'cursor-pointer hover:bg-rule-faint' : 'opacity-40 cursor-not-allowed'
                     }`}
                     title={canUpload ? undefined : `Set the ${ownerLabel} first`}
                 >
@@ -183,7 +126,7 @@ const ImageUploadField: React.FC<{
                         type="button"
                         onClick={handleRemove}
                         disabled={isUploading}
-                        className="p-2 text-gray-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="p-2 text-ink-faint hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         title={isUploading ? 'Wait for the upload to finish' : 'Remove'}
                     >
                         <X className="w-4 h-4" />
@@ -197,7 +140,7 @@ const ImageUploadField: React.FC<{
                     cannot overwrite each other's image.
                 </p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-ink-faint">
                 Uploading is itself a publish: the file goes to the bucket the moment you choose it,
                 whether or not you save. Removing clears the link only. The file stays in the bucket and
                 remains publicly reachable.

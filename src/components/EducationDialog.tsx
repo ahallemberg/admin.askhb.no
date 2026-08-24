@@ -9,7 +9,7 @@ import { useConfirm } from "../func/confirmContext";
 import DateRangePicker from "./DateRangePicker";
 import { formatDateRange } from "../func/dates";
 
-const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
+const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
 const EducationDialog: React.FC<{
     education: EducationItem;
@@ -81,7 +81,7 @@ const EducationDialog: React.FC<{
         >
             <div className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Degree</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Degree</label>
                     <input
                         type="text"
                         value={tempItem.degree}
@@ -90,7 +90,7 @@ const EducationDialog: React.FC<{
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Institution</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Institution</label>
                     <input
                         type="text"
                         value={tempItem.institution}
@@ -106,10 +106,10 @@ const EducationDialog: React.FC<{
 
                 <div>
                     <div className="flex justify-between items-center mb-3">
-                        <label className="block text-sm font-medium text-gray-700">Description</label>
+                        <label className="block text-sm font-medium text-ink-muted">Description</label>
                         <button
                             onClick={addDescription}
-                            className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                            className="text-sm text-ink-muted hover:text-ink transition-colors"
                         >
                             + Add Item
                         </button>
@@ -126,7 +126,7 @@ const EducationDialog: React.FC<{
                                 />
                                 <button
                                     onClick={() => removeDescription(index)}
-                                    className="p-3 text-gray-400 hover:text-red-600 transition-colors"
+                                    className="p-3 text-ink-faint hover:text-red-600 transition-colors"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -136,8 +136,8 @@ const EducationDialog: React.FC<{
                     {/* The site lifts a line matching this shape into a labelled
                         rail beside the entry. Said here because the pattern is
                         strict and the preview is the only other place it shows. */}
-                    <p className="mt-2 text-xs text-gray-500">
-                        A line written exactly as "GPA: 4,79/5" is pulled out and rendered on its own.
+                    <p className="mt-2 text-xs text-ink-faint">
+                        A line written exactly as "GPA: 4,79/5" is pulled out and rendered on its own. Supports [text](https://example.com), **bold** and *italic*.
                     </p>
                 </div>
             </div>

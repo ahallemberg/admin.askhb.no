@@ -16,11 +16,11 @@ const PersonalInfoCard: React.FC<{
     personalInfo: PersonalInfo;
     onEdit: () => void;
 }> = ({ personalInfo, onEdit }) => (
-    <div className="mb-6 group relative bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <div className="mb-6 group relative bg-paper rounded-lg p-6 shadow-sm border border-rule hover:shadow-md transition-shadow">
         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
                 onClick={onEdit}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
+                className="p-2 text-ink-faint hover:text-ink-muted transition-colors rounded-lg hover:bg-rule-faint"
                 title="Edit"
             >
                 <Edit className="w-4 h-4" />
@@ -44,15 +44,15 @@ const PersonalInfoCard: React.FC<{
             <img
                 src={personalInfo.profilePictureUrl || R2_PROFILE_PICTURE}
                 alt=""
-                className="w-20 h-20 shrink-0 object-contain rounded border border-gray-200"
+                className="w-20 h-20 shrink-0 object-contain rounded border border-rule"
             />
 
             <div className="min-w-0">
                 <h3 className="text-xl font-semibold">{personalInfo.name}</h3>
-                <p className="text-gray-600">{personalInfo.title}</p>
+                <p className="text-ink-muted">{personalInfo.title}</p>
                 {/* Split the way the site splits it, so a card showing one block
                     of text is telling you the paragraph break did not take. */}
-                <div className="mt-2 text-gray-700">
+                <div className="mt-2 text-ink-muted">
                     {splitParagraphs(personalInfo.about).map((paragraph, index) => (
                         <p key={index} className={index > 0 ? "mt-2" : undefined}>{paragraph}</p>
                     ))}

@@ -6,8 +6,8 @@ import { deriveReadMoreUrl } from "../func/links";
 import type { PublishedPage } from "../func/pages";
 import { formatDateRange } from "../func/dates";
 
-const FIELD_CLASS = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors";
-const ICON_BUTTON_CLASS = "p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 transition-colors";
+const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
+const ICON_BUTTON_CLASS = "p-2 text-ink-faint hover:text-ink-muted disabled:opacity-30 disabled:hover:text-ink-faint transition-colors";
 
 // One role inside an organisation — the old single-entry experience form minus
 // `company`, which has moved up to the organisation, plus `result`.
@@ -66,12 +66,12 @@ const RoleEditor: React.FC<{
     };
 
     return (
-        <div className="border border-gray-200 rounded-lg">
-            <div className="flex justify-between items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-                <span className="text-sm font-semibold text-gray-700 truncate">
+        <div className="border border-rule rounded-lg">
+            <div className="flex justify-between items-center gap-3 px-4 py-2 bg-rule-faint border-b border-rule rounded-t-lg">
+                <span className="text-sm font-semibold text-ink-muted truncate">
                     Role {index + 1}
                     {role.title.trim() !== '' && (
-                        <span className="font-normal text-gray-500"> — {role.title}</span>
+                        <span className="font-normal text-ink-muted"> — {role.title}</span>
                     )}
                 </span>
                 <div className="flex shrink-0">
@@ -100,7 +100,7 @@ const RoleEditor: React.FC<{
                         // An organisation with no roles renders nothing at all on
                         // askhb.no, so the last one cannot be taken away.
                         title={canRemove ? 'Remove role' : 'An organisation needs at least one role'}
-                        className="p-2 text-gray-400 hover:text-red-600 disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                        className="p-2 text-ink-faint hover:text-red-600 disabled:opacity-30 disabled:hover:text-ink-faint transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
@@ -109,7 +109,7 @@ const RoleEditor: React.FC<{
 
             <div className="p-4 space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Job Title</label>
                     <input
                         type="text"
                         value={role.title}
@@ -125,17 +125,20 @@ const RoleEditor: React.FC<{
                 />
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Description</label>
                     <textarea
                         value={role.description}
                         onChange={(e) => onChange({ ...role, description: e.target.value })}
                         rows={6}
                         className={FIELD_CLASS + " resize-none"}
                     />
+                    <p className="mt-1 text-xs text-ink-faint">
+                        Supports [text](https://example.com), **bold** and *italic*.
+                    </p>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Result (optional)</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Result (optional)</label>
                     <input
                         type="text"
                         value={role.result ?? ''}
@@ -144,7 +147,7 @@ const RoleEditor: React.FC<{
                         onChange={(e) => onChange({ ...role, result: e.target.value === '' ? undefined : e.target.value })}
                         className={FIELD_CLASS}
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-ink-faint">
                         The outcome, stated plainly — e.g. "2× more shelters found, at higher precision".
                         Rendered as a ruled "Result" line. Leave empty if there is no clean headline
                         number; the layout closes up.
@@ -159,7 +162,7 @@ const RoleEditor: React.FC<{
                 />
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Skills</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-3">Skills</label>
                     <div className="flex flex-wrap gap-2 mb-3">
                         {role.skills.map((skill, skillIndex) => (
                             <span
@@ -167,13 +170,13 @@ const RoleEditor: React.FC<{
                                 // inline-flex, not the `inline-block … flex` pair the old
                                 // dialog carried: those are two values for `display` and
                                 // which one wins is down to stylesheet order.
-                                className="inline-flex items-center gap-2 bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2"
+                                className="inline-flex items-center gap-2 bg-rule rounded-full px-3 py-1 text-sm font-semibold text-ink-muted mr-2 mb-2"
                             >
                                 {skill}
                                 <button
                                     type="button"
                                     onClick={() => removeSkill(skillIndex)}
-                                    className="text-gray-400 hover:text-red-600 transition-colors"
+                                    className="text-ink-faint hover:text-red-600 transition-colors"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
@@ -187,12 +190,12 @@ const RoleEditor: React.FC<{
                             value={newSkill}
                             onChange={(e) => onNewSkillChange(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addSkill()}
-                            className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                            className="flex-1 p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors"
                         />
                         <button
                             type="button"
                             onClick={addSkill}
-                            className="px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                            className="px-4 py-3 bg-ink text-paper rounded-lg hover:bg-ink-muted transition-colors"
                         >
                             Add
                         </button>

@@ -128,6 +128,13 @@ there is no versioning and no DELETE to get it back:**
 | `ImageUploadField` remove | Clears a link; the object stays in the bucket, and dialog Cancel undoes the field |
 | `CvSection` remove | Clears `cvUrl`; the PDF stays reachable at a deterministic URL that re-uploading restores |
 | `EducationDialog.removeDescription`, `RoleEditor.removeSkill`, `ProjectDialog.removeSkill`, `LinksEditor` remove-link | Dialog-local, one field, undone by Cancel and trivially retyped |
+| `ScreenshotCapture` re-capture | Overwrites the previous capture at the same key, but a capture is *regenerated from the live site* — the thing it destroys can be remade by pressing the button again, which is exactly what "reconstruct" means. Contrast the upload replaces above, where the file on disk may be the only copy |
+| `ScreenshotCapture` remove-dark | Clears the stored dark url; the object stays in the bucket |
+
+The capture and the upload field write to the same prefix, so a hand-uploaded
+file named like a capture would collide with one. That case is already covered:
+`ImageUploadField`'s prompt fires on a computed-key match, whatever produced the
+object currently at that key.
 
 This replaces an earlier "one rule, no exceptions" framing. That rule was not
 actually kept — it confirmed the harmless removes while leaving the destructive
