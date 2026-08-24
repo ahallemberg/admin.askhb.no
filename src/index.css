@@ -8,6 +8,27 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Keep the design notes and implementation plans out of the scan. Tailwind walks
+ * every file in the project that git does not ignore, and a written document
+ * that quotes markup reads to it exactly like a component would: the names it
+ * picks up there are compiled into shipped rules, for markup that has since been
+ * rewritten or never existed outside the proposal. Eleven such rules were
+ * shipping when this was added, all from a plan describing the centred panel
+ * EditorDialog had before it became full-viewport.
+ *
+ * What is excluded is a path, not a set of names, and that difference is the
+ * point. Nothing under that directory is ever rendered, so ignoring it can only
+ * remove dead output, while everything the components genuinely use is still
+ * discovered the ordinary way. Naming the individual utilities to suppress
+ * instead would break them project-wide -- a later honest use of the same name
+ * anywhere under src/ would quietly render unstyled.
+ *
+ * askhb.no carries the same exclusion for the same reason. The hazard is the
+ * repo layout, not anything specific to either app.
+ */
+@source not "../docs";
+
 @theme static {
     /*
      * The chrome renders in the site's face now. This used to be deliberately
