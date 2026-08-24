@@ -10,18 +10,19 @@ import PersonalInfoCard from '../components/PersonalInfoCard';
 import PersonalInfoDialog from '../components/PersonalInfoDialog';
 import CvSection from '../components/CvSection';
 import DraggableList from '../components/DraggableList';
-import type { EducationItem, PortfolioData, PersonalInfo, ExperienceItem, Organisation, ProjectItem } from '../types/props';
-import { fetchFromR2, fetchFromR2OrDefault } from '../func/data';
-import { normaliseDate } from '../func/dates';
-import { groupExperiences, isOrganisationArray } from '../func/organisations';
+import type { EducationItem, PortfolioData, PersonalInfo, Organisation, ProjectItem } from '../types/props';
 import { fetchPublishedPages, type PublishedPage } from '../func/pages';
 import { deepEqual } from '../func/compare';
 import { useConfirm } from '../func/confirmContext';
 import { EMPTY_IDS, mintIds, withAdded, withOrder, withRemoved, type EntryIds } from '../func/entryIds';
 import { badgeFor, describeChanges, labelFor, type Change, type ChangeSection } from '../func/changes';
+import { loadPortfolio } from '../func/loadPortfolio';
+import { clearDraft, readDraft, writeDraft } from '../func/draftStorage';
+import { classify, mergePersonalInfo, FILE_NAME, type FileKey } from '../func/resolveDraft';
+import StaleDraftDialog from '../components/StaleDraftDialog';
 import Toast from '../components/Toast';
 import Notice from '../components/Notice';
-import { R2_GET_ENDPOINT, R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH, PROJECTS_PATH } from '../constants/app';
+import { R2_PUT_ENDPOINT, EXPERIENCE_PATH, EDUCATION_PATH, PERSONAL_INFO_PATH, PROJECTS_PATH } from '../constants/app';
 
 
 // Stable blank drafts. A fresh object here would change the dialog's prop identity on
@@ -124,6 +125,23 @@ const PortfolioEditor: React.FC = () => {
      */
     const [entryIds, setEntryIds] = useState<EntryIds>(EMPTY_IDS);
     const [savedEntryIds, setSavedEntryIds] = useState<EntryIds | null>(null);
+    /*
+     * What the bucket held when the *current draft* forked, which is not the same
+     * question as what it holds now. Collapsing the two is a data-loss bug: a
+     * fork point rewritten whenever the draft changes warns once that the bucket
+     * moved and then goes quiet, while the draft that would overwrite it is still
+     * sitting there.
+     *
+     * Assigned in exactly five places -- both load branches, a successful save,
+     * Discard, and per key when the stale dialog resolves one -- and read
+     * everywhere else, the write effect included.
+     */
+    const [draftBase, setDraftBase] = useState<PortfolioData | null>(null);
+    const [failedFiles, setFailedFiles] = useState<string[]>([]);
+    // What the restore found, if anything: drives the notice and the resolver.
+    const [restored, setRestored] = useState<{ savedAt: number; conflicts: FileKey[]; ownPartialFailure: boolean } | null>(null);
+    const [staleOpen, setStaleOpen] = useState(false);
+    const [storageBroken, setStorageBroken] = useState(false);
     // A failed save leaves R2 mixed even when the user had made no edits, so the
     // editor must keep saying so rather than looking clean because nothing changed.
     const [saveFailed, setSaveFailed] = useState(false);
@@ -134,7 +152,7 @@ const PortfolioEditor: React.FC = () => {
     const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
     // The failure that has to outlive a glance: a partial save leaves askhb.no
     // serving a mix, and nothing here can un-publish the half that landed.
-    const [saveError, setSaveError] = useState<{ kind: 'partial' | 'total'; failed: string[] } | null>(null);
+    const [saveError, setSaveError] = useState<{ kind: 'partial' | 'total' | 'conflict' | 'refetch-failed'; failed: string[] } | null>(null);
     // Stable, so Toast's dismissal timer is not restarted by unrelated renders.
     const dismissToast = useCallback(() => setToast(null), []);
     // What load-time normalisation changed, if anything. Kept separate from isDirty:
@@ -164,76 +182,88 @@ const PortfolioEditor: React.FC = () => {
     const [showChanges, setShowChanges] = useState(false);
     
     useEffect(() => {
-        const loadPortfolioData = async () => {
+        // StrictMode invokes this twice in development. Without the flag both
+        // passes reach the restore branch, and the second would race the first
+        // through state the first is still deciding.
+        let ignore = false;
+
+        const load = async () => {
             try {
                 setIsLoading(true);
                 setLoadError(null);
-                
-                // Only projects.json tolerates a 404 — it is the one object that does
-                // not exist until this editor first writes it. The other three must
-                // keep failing loudly: a 404 from a path typo or a worker routing
-                // change would otherwise load empty content that the next Save would
-                // write over the real thing.
-                const [personalInfo, rawExperiences, education, projects] = await Promise.all([
-                    fetchFromR2<PersonalInfo>(R2_GET_ENDPOINT + PERSONAL_INFO_PATH),
-                    fetchFromR2<unknown>(R2_GET_ENDPOINT + EXPERIENCE_PATH),
-                    fetchFromR2<EducationItem[]>(R2_GET_ENDPOINT + EDUCATION_PATH),
-                    fetchFromR2OrDefault<ProjectItem[]>(R2_GET_ENDPOINT + PROJECTS_PATH, [])
-                ]);
 
-                // Already grouped, or still the flat pre-organisation array? This guard
-                // is load-bearing for data integrity, not just shape: groupExperiences
-                // rebuilds each role from a fixed set of legacy fields, so running it
-                // over already-grouped data would drop result, location, logoUrl,
-                // logoScale and commitment, and collapse every multi-role organisation
-                // to one role. The file is written wholesale, so it is one shape or the
-                // other and testing the first element is enough.
-                const alreadyGrouped = isOrganisationArray(rawExperiences);
-                // Empty when the file is already grouped, so the count below can read
-                // off it directly rather than asking the guard a second time.
-                const legacyExperiences = alreadyGrouped ? [] : rawExperiences as ExperienceItem[];
-                const organisations: Organisation[] = alreadyGrouped
-                    ? rawExperiences
-                    : groupExperiences(legacyExperiences);
+                // The same function the pre-save check calls, so the two can
+                // never disagree about what "what the bucket holds" means.
+                const { loaded, migration: counts } = await loadPortfolio();
+                if (ignore) return;
 
-                // Backfill dateRange and canonicalise the date string for every entry.
-                // An entry whose date cannot be parsed comes back untouched.
-                const loaded: PortfolioData = {
-                    personalInfo,
-                    experiences: organisations,
-                    education: education.map(normaliseDate),
-                    projects
-                };
-
-                // Counted, not just flagged: "3 dates will be reformatted" tells the
-                // user what a save is about to do to content they cannot otherwise see.
-                // Education is still compared positionally; experiences cannot be, now
-                // that N entries become M organisations, so the regrouping is reported
-                // as its own count instead. groupExperiences runs normaliseDate and
-                // normaliseLinks internally, so a regrouping save subsumes both.
-                const reformatted = education.filter((item, i) => item.date !== loaded.education[i].date).length;
-                const structured = education.filter((item, i) => !item.dateRange && !!loaded.education[i].dateRange).length;
-                const regrouped = legacyExperiences.length;
-                setMigration(reformatted > 0 || structured > 0 || regrouped > 0
-                    ? { reformatted, structured, regrouped }
-                    : null);
-
-                // Snapshot the normalised form, not the raw fetch: otherwise the editor
-                // would report unsaved changes the instant it finished loading.
-                const ids = mintIds(loaded);
+                setMigration(counts);
                 setSavedSnapshot(loaded);
-                setSavedEntryIds(ids);
-                setPortfolio(loaded);
-                setEntryIds(ids);
-                
+
+                const stored = readDraft();
+
+                // Nothing kept, or what was kept is what the bucket now holds.
+                // Identical to the behaviour before drafts existed.
+                if (!stored || deepEqual(stored.draft, loaded)) {
+                    const ids = mintIds(loaded);
+                    setPortfolio(loaded);
+                    setDraftBase(loaded);
+                    setEntryIds(ids);
+                    setSavedEntryIds(ids);
+                    clearDraft();
+                    return;
+                }
+
+                /*
+                 * A draft outlived the page. Restore it -- and set draftBase from
+                 * the stored fork point, NOT from what was just fetched. Taking
+                 * `loaded` here is precisely the rebasing bug: it would erase the
+                 * evidence that the draft predates the bucket's current content.
+                 */
+                setPortfolio(stored.draft);
+                setDraftBase(stored.base);
+                setEntryIds(stored.draftIds);
+
+                /*
+                 * The snapshot's ids have to come from the same minting as the
+                 * draft's, or the change count diffs two unrelated id spaces and
+                 * reports every entry as deleted-plus-added. baseIds is that
+                 * minting; a section the bucket genuinely moved gets fresh ids,
+                 * because its entries are not the ones those ids named.
+                 */
+                const fresh = mintIds(loaded);
+                setSavedEntryIds({
+                    experiences: deepEqual(stored.base.experiences, loaded.experiences) ? stored.baseIds.experiences : fresh.experiences,
+                    education: deepEqual(stored.base.education, loaded.education) ? stored.baseIds.education : fresh.education,
+                    projects: deepEqual(stored.base.projects, loaded.projects) ? stored.baseIds.projects : fresh.projects
+                });
+
+                // Restored, not merely read for a string: these die with the
+                // reload otherwise, and the next write would record saveFailed
+                // as false, erasing the only record that the bucket is mixed.
+                setSaveFailed(stored.saveFailed);
+                setFailedFiles(stored.failedFiles);
+
+                const conflicts = classify(stored.base, stored.draft, loaded)
+                    .filter(outcome => outcome.resolution === 'conflict')
+                    .map(outcome => outcome.key);
+
+                setRestored({ savedAt: stored.savedAt, conflicts, ownPartialFailure: stored.saveFailed });
+                if (conflicts.length > 0) setStaleOpen(true);
+
             } catch (error) {
+                if (ignore) return;
                 console.error('Error loading portfolio data:', error);
                 setLoadError(error instanceof Error ? error.message : 'Failed to load portfolio data');
+                // Storage is deliberately left alone. Clearing here would destroy
+                // the work a transient outage was supposed to protect.
             } finally {
-                setIsLoading(false);
+                if (!ignore) setIsLoading(false);
             }
-        }
-        loadPortfolioData();
+        };
+
+        load();
+        return () => { ignore = true; };
     }, []);
 
     useEffect(() => {
@@ -398,6 +428,124 @@ const PortfolioEditor: React.FC = () => {
     const changesBySection = (section: ChangeSection) => changes.filter(change => change.section === section);
 
     const isDirty = saveFailed || (savedSnapshot !== null && !deepEqual(portfolio, savedSnapshot));
+    // True while a draft would overwrite content the bucket no longer holds.
+    // Derived, so choosing "decide later" needs no flag to remember it by: the
+    // condition simply stays true until a save or a resolution makes it false.
+    const isStale = changes.length > 0 && draftBase !== null && savedSnapshot !== null
+        && !deepEqual(draftBase, savedSnapshot);
+
+    /*
+     * Persist the draft. No debounce: `portfolio` changes only on discrete events
+     * -- a dialog's Save, a delete, a reorder, an upload -- because every text
+     * field lives in its own dialog's state and never reaches here per keystroke.
+     *
+     * The dependency list is load-bearing and easy to get wrong. A successful save
+     * calls setSavedSnapshot(portfolio) with the *same object reference*, so
+     * `portfolio` does not change identity; keyed on it alone this would not
+     * re-run and storage would never be cleared after a save. saveFailed and
+     * failedFiles matter for the mirror-image reason: a partial failure changes
+     * nothing else at all, so without them the envelope never records it.
+     */
+    useEffect(() => {
+        // Until the fetch resolves, `portfolio` is the blank initial value -- the
+        // one CLAUDE.md warns must never reach the bucket. It must never be
+        // persisted either, or a restore would feed it straight back in.
+        if (savedSnapshot === null || savedEntryIds === null || draftBase === null) return;
+
+        // Nothing pending. Kept anyway while the bucket is mixed: saveFailed is
+        // React state and dies with the reload, so the envelope is the only thing
+        // that can tell the next load about it.
+        if (deepEqual(portfolio, savedSnapshot) && !saveFailed) {
+            clearDraft();
+            return;
+        }
+
+        const kept = writeDraft({
+            saveFailed,
+            failedFiles,
+            base: draftBase,
+            baseIds: savedEntryIds,
+            draft: portfolio,
+            draftIds: entryIds
+        });
+        // Said out loud rather than swallowed: believing you have a backup when
+        // you do not is worse than knowing you have none.
+        setStorageBroken(!kept);
+    }, [portfolio, savedSnapshot, draftBase, entryIds, savedEntryIds, saveFailed, failedFiles]);
+
+    const discardChanges = async () => {
+        const confirmed = await confirm({
+            title: changes.length === 1 ? 'Discard 1 unsaved change?' : `Discard ${changes.length} unsaved changes?`,
+            body: (
+                <>
+                    <p>
+                        The editor goes back to what the bucket held when this page loaded, and the
+                        local copy is deleted with it. This cannot be undone.
+                    </p>
+                    <ul className="mt-3 flex flex-col gap-1.5 border-t border-rule pt-3">
+                        {changes.map((change, index) => (
+                            <li key={index} className="flex items-start gap-2">
+                                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${DOT[change.kind]}`} />
+                                {labelFor(change)}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ),
+            confirmLabel: 'Discard changes'
+        });
+        if (!confirmed || !savedSnapshot || !savedEntryIds) return;
+
+        setPortfolio(savedSnapshot);
+        // Both, or the count is left diffing a restored draft's ids against the
+        // ids the bucket's content was minted with.
+        setEntryIds(savedEntryIds);
+        // Resetting the fork point too is what stops a discarded divergence from
+        // leaving a stale warning behind with no draft to justify it.
+        setDraftBase(savedSnapshot);
+        setRestored(null);
+        setToast({ id: Date.now(), message: 'Changes discarded' });
+    };
+
+    /*
+     * Applying the stale dialog's answers. Every key it resolves -- the ones it
+     * asked about and the ones it settled silently -- advances draftBase to what
+     * the bucket holds.
+     *
+     * That looks like the rebasing bug and is its opposite. Rebasing without
+     * resolution is what made the warning go quiet while the danger stood;
+     * rebasing *on* resolution is what "resolved" means. Leave it out and the
+     * resolver deadlocks: the pre-save check would keep finding the difference
+     * the dialog just settled, and the file could never be saved.
+     */
+    const applyResolution = (keep: Record<FileKey, 'draft' | 'bucket'>) => {
+        if (!savedSnapshot || !draftBase) return;
+
+        const outcomes = classify(draftBase, portfolio, savedSnapshot);
+        const next: PortfolioData = { ...portfolio };
+
+        outcomes.forEach(({ key, resolution }) => {
+            const takeBucket = resolution === 'bucket'
+                || (resolution === 'conflict' && keep[key] === 'bucket');
+            if (key === 'personalInfo') {
+                // Field-wise, because this one file has two owners: cvUrl comes
+                // from CvSection and the rest from the personal info dialog, so a
+                // whole-file choice would discard one of two edits that do not
+                // overlap in any field.
+                const { merged } = mergePersonalInfo(draftBase.personalInfo, portfolio.personalInfo, savedSnapshot.personalInfo);
+                next.personalInfo = resolution === 'conflict' && keep[key] === 'draft'
+                    ? { ...merged, ...portfolio.personalInfo }
+                    : merged;
+                return;
+            }
+            if (takeBucket) (next[key] as unknown) = savedSnapshot[key];
+        });
+
+        setPortfolio(next);
+        setDraftBase(savedSnapshot);
+        setStaleOpen(false);
+        setRestored(null);
+    };
 
     useEffect(() => {
         if (!isDirty) return;
@@ -454,6 +602,50 @@ const PortfolioEditor: React.FC = () => {
         setIsSaving(true);
         setSaveError(null);
 
+        /*
+         * The safeguard. The load-time check only ever compared against a fetch
+         * taken when the page opened, so it is blind to the window that actually
+         * loses work: the bucket changing between that load and this save. A tab
+         * left open on a laptop while an edit is made from a phone is the ordinary
+         * case, not an exotic one.
+         *
+         * Compared against draftBase rather than savedSnapshot, and that is what
+         * makes one check cover both windows. In the ordinary case the two are
+         * equal. After a restore they are not: savedSnapshot has already moved on
+         * to what this page load fetched, so comparing against it would find no
+         * difference and let a stale draft overwrite the bucket anyway.
+         */
+        if (draftBase) {
+            let current: PortfolioData;
+            try {
+                current = (await loadPortfolio()).loaded;
+            } catch (error) {
+                // A read that did not succeed is not evidence that writing is
+                // safe -- the same reasoning that keeps fetchFromR2OrDefault's
+                // fallback narrowed to a 404.
+                console.error('Pre-save re-fetch failed:', error);
+                setSaveError({ kind: 'refetch-failed', failed: [] });
+                setIsSaving(false);
+                return;
+            }
+
+            const moved = classify(draftBase, portfolio, current)
+                .filter(outcome => outcome.resolution === 'conflict')
+                .map(outcome => outcome.key);
+
+            if (moved.length > 0) {
+                // Nothing is written. The bucket's newer content is adopted as the
+                // snapshot so the resolver has something current to reconcile
+                // against, and the same dialog the load uses asks about it.
+                setSavedSnapshot(current);
+                setRestored({ savedAt: Date.now(), conflicts: moved, ownPartialFailure: false });
+                setStaleOpen(true);
+                setSaveError({ kind: 'conflict', failed: moved.map(key => FILE_NAME[key]) });
+                setIsSaving(false);
+                return;
+            }
+        }
+
         try {
             const headers = {
                 'Content-Type': 'application/json',
@@ -490,6 +682,11 @@ const PortfolioEditor: React.FC = () => {
                 // Only now does the on-screen state match what is in R2.
                 setSavedSnapshot(portfolio);
                 setSavedEntryIds(entryIds);
+                // The draft has been published, so what the bucket holds and what
+                // the draft forked from are the same thing again.
+                setDraftBase(portfolio);
+                setFailedFiles([]);
+                setRestored(null);
                 setSaveFailed(false);
                 setMigration(null);
                 setToast({ id: Date.now(), message: 'Portfolio saved' });
@@ -498,6 +695,7 @@ const PortfolioEditor: React.FC = () => {
                 // The four PUTs are independent with no rollback, so a partial failure
                 // leaves R2 in a mixed state. Name the files so it is recoverable.
                 setSaveFailed(true);
+                setFailedFiles(failed);
                 setSaveError({ kind: 'partial', failed });
                 console.error('Some saves failed:', failed, results);
             }
@@ -559,6 +757,14 @@ const PortfolioEditor: React.FC = () => {
                                 <span className="text-sm text-ink-muted">{describeMigration(migration)}</span>
                             )}
                             <button
+                                onClick={discardChanges}
+                                disabled={changes.length === 0}
+                                title={changes.length === 0 ? 'Nothing to discard' : undefined}
+                                className="rounded-lg border border-rule px-4 py-2 text-sm text-ink-muted transition-colors hover:bg-paper hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Discard
+                            </button>
+                            <button
                                 onClick={savePortfolio}
                                 // Do NOT add !isDirty here. The pending date migration is
                                 // not a user edit, so a dirty-gated button would make it
@@ -579,31 +785,89 @@ const PortfolioEditor: React.FC = () => {
                     </div>
                 </header>
 
-                {saveError && (
-                    <div className="mb-6">
-                        <Notice
-                            tone="error"
-                            action={{ label: 'Retry', onClick: savePortfolio }}
-                            onDismiss={() => setSaveError(null)}
-                        >
-                            {saveError.kind === 'partial' ? (
-                                <>
-                                    <strong className="font-semibold">
-                                        Saved {4 - saveError.failed.length} of 4 files.
-                                    </strong>{' '}
-                                    {saveError.failed.join(' and ')} failed — askhb.no is serving a mix
-                                    of old and new until you save again.
-                                </>
-                            ) : (
-                                <>
-                                    <strong className="font-semibold">Nothing was saved.</strong>{' '}
-                                    The bucket could not be reached, so askhb.no is unchanged. Check
-                                    your connection and try again.
-                                </>
-                            )}
-                        </Notice>
-                    </div>
+                {/* Ordered by how much they need doing something about: what is
+                    wrong with the live site first, then what is pending here. */}
+                <div className="mb-6 flex flex-col gap-3">
+                {saveFailed && !saveError && (
+                    <Notice tone="error">
+                        <strong className="font-semibold">askhb.no is serving a mix of old and new.</strong>{' '}
+                        {failedFiles.length > 0
+                            ? `${failedFiles.join(' and ')} did not save.`
+                            : 'A save only partly landed.'}{' '}
+                        Saving again fixes it.
+                    </Notice>
                 )}
+                {isStale && !staleOpen && (
+                    <Notice
+                        tone="warning"
+                        action={restored && restored.conflicts.length > 0
+                            ? { label: 'Resolve', onClick: () => setStaleOpen(true) }
+                            : undefined}
+                    >
+                        <strong className="font-semibold">This draft is older than the bucket.</strong>{' '}
+                        Saving it overwrites content edited somewhere else. The bucket keeps no versions.
+                    </Notice>
+                )}
+                {restored && restored.conflicts.length === 0 && (
+                    <Notice tone="info" onDismiss={() => setRestored(null)}>
+                        Restored unsaved changes from{' '}
+                        <strong className="font-semibold">
+                            {new Date(restored.savedAt).toLocaleString(undefined, {
+                                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                            })}
+                        </strong>. They have not been published yet.
+                    </Notice>
+                )}
+                {storageBroken && (
+                    <Notice tone="warning" onDismiss={() => setStorageBroken(false)}>
+                        <strong className="font-semibold">This browser will not keep a local copy.</strong>{' '}
+                        Unsaved changes will be lost if you refresh — a private window is the usual
+                        reason. Save more often until that changes.
+                    </Notice>
+                )}
+                {saveError && (
+                    <Notice
+                        tone={saveError.kind === 'partial' ? 'error' : 'warning'}
+                        // A conflict is answered in the dialog, not by trying the
+                        // same save again.
+                        action={saveError.kind === 'conflict'
+                            ? undefined
+                            : { label: 'Retry', onClick: savePortfolio }}
+                        onDismiss={() => setSaveError(null)}
+                    >
+                        {saveError.kind === 'partial' && (
+                            <>
+                                <strong className="font-semibold">
+                                    Saved {4 - saveError.failed.length} of 4 files.
+                                </strong>{' '}
+                                {saveError.failed.join(' and ')} failed — askhb.no is serving a mix
+                                of old and new until you save again.
+                            </>
+                        )}
+                        {saveError.kind === 'total' && (
+                            <>
+                                <strong className="font-semibold">Nothing was saved.</strong>{' '}
+                                The bucket could not be reached, so askhb.no is unchanged. Your draft
+                                is kept in this browser and will survive a refresh.
+                            </>
+                        )}
+                        {saveError.kind === 'conflict' && (
+                            <>
+                                <strong className="font-semibold">Save stopped — the bucket moved.</strong>{' '}
+                                {saveError.failed.join(' and ')} changed since this page loaded, so
+                                nothing was written. Choose what to keep.
+                            </>
+                        )}
+                        {saveError.kind === 'refetch-failed' && (
+                            <>
+                                <strong className="font-semibold">Could not check the bucket first.</strong>{' '}
+                                Nothing was written, so askhb.no is unchanged. Saving without knowing
+                                what is there risks overwriting it, so try again when the connection is back.
+                            </>
+                        )}
+                    </Notice>
+                )}
+                </div>
 
                 {/* Loading State */}
                 {isLoading && (
@@ -804,6 +1068,18 @@ const PortfolioEditor: React.FC = () => {
                     </>
                 )}
             </div>
+
+            {staleOpen && restored && restored.conflicts.length > 0 && (
+                <StaleDraftDialog
+                    conflicts={restored.conflicts}
+                    savedAt={restored.savedAt}
+                    ownPartialFailure={restored.ownPartialFailure}
+                    onResolve={applyResolution}
+                    // Keeps the draft as it stands. Nothing is lost by deciding
+                    // later: isStale holds the warning until something resolves it.
+                    onDismiss={() => setStaleOpen(false)}
+                />
+            )}
 
             {toast && (
                 <Toast key={toast.id} message={toast.message} onDismiss={dismissToast} />
