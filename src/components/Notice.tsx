@@ -15,7 +15,7 @@ type Tone = 'error' | 'warning' | 'info';
 const TONES: Record<Tone, { surface: string; icon: typeof AlertTriangle }> = {
     error: { surface: 'bg-red-50 border-red-200 text-red-900', icon: AlertTriangle },
     warning: { surface: 'bg-amber-50 border-amber-200 text-amber-900', icon: AlertTriangle },
-    info: { surface: 'bg-white border-gray-200 text-gray-700', icon: Info }
+    info: { surface: 'bg-paper border-rule text-ink-muted', icon: Info }
 };
 
 const Notice: React.FC<{

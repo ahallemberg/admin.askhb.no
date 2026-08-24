@@ -72,7 +72,27 @@ const CvSection: React.FC<{
         }
     };
 
-    const handleRemove = () => {
+    const handleRemove = async () => {
+        /*
+         * Confirmed even though it destroys nothing: the PDF stays in the bucket
+         * and stays reachable at its URL. What it has that the other remove
+         * buttons do not is nowhere to undo it. This one sits on the page rather
+         * than inside a dialog, so there is no Cancel to back out of, and the
+         * portfolio hides its download button the moment the link goes.
+         */
+        const confirmed = await confirm({
+            title: 'Remove the CV from the portfolio?',
+            body: (
+                <p>
+                    askhb.no stops showing its download button. The PDF itself stays in the bucket
+                    and anyone holding its URL can still reach it — the worker has no way to delete
+                    it. Restoring the link means uploading the file again.
+                </p>
+            ),
+            confirmLabel: 'Remove CV'
+        });
+        if (!confirmed) return;
+
         // Invalidate any upload still in flight, otherwise it would set cvUrl again
         // when it lands and undo this.
         latestUpload.current++;

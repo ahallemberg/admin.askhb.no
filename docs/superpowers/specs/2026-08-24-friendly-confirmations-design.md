@@ -101,7 +101,10 @@ a caller where that distinction bites.
 ### What gets confirmed, and why
 
 The rule is **confirm anything that destroys something you cannot reconstruct**,
-not "confirm anything with a trash icon".
+not "confirm anything with a trash icon" — where "reconstruct" has to mean
+*reachable from inside the editor*, not merely possible in principle. Clearing
+the CV link destroys nothing in the bucket, but nothing in this piece can put it
+back, and that is what decides it.
 
 **Confirmed — the content is gone and you would have to retype it:**
 
@@ -110,6 +113,7 @@ not "confirm anything with a trash icon".
 | Organisation / project / education card delete | Names the entry; for an organisation, its role count |
 | Role removal in `OrganisationDialog` | A role is title, dates, description and skills |
 | The four discard-changes prompts | Unchanged wording; `PersonalInfoDialog` keeps its photo-replaced variant verbatim |
+| `CvSection` remove | Destroys nothing — the PDF stays in the bucket — but there is nowhere to undo it. It is the only remove that sits on the page rather than inside a dialog, so no Cancel backs it out, and the Discard button that would is in the second piece. Restoring the link means having the file again |
 
 **Confirmed — the bucket object is overwritten the moment you pick a file, and
 there is no versioning and no DELETE to get it back:**
@@ -126,7 +130,6 @@ there is no versioning and no DELETE to get it back:**
 | Site | Why |
 |---|---|
 | `ImageUploadField` remove | Clears a link; the object stays in the bucket, and dialog Cancel undoes the field |
-| `CvSection` remove | Clears `cvUrl`; the PDF stays reachable at a deterministic URL that re-uploading restores |
 | `EducationDialog.removeDescription`, `RoleEditor.removeSkill`, `ProjectDialog.removeSkill`, `LinksEditor` remove-link | Dialog-local, one field, undone by Cancel and trivially retyped |
 | `ScreenshotCapture` re-capture | Overwrites the previous capture at the same key, but a capture is *regenerated from the live site* — the thing it destroys can be remade by pressing the button again, which is exactly what "reconstruct" means. Contrast the upload replaces above, where the file on disk may be the only copy |
 | `ScreenshotCapture` remove-dark | Clears the stored dark url; the object stays in the bucket |
@@ -174,6 +177,15 @@ The partial-failure copy names the files and says what it means for the site:
 > ⚠ Saved 2 of 4 files. `experiences.json` and `education.json` failed —
 > askhb.no is serving a mix of old and new until you save again.
 
+### Palette
+
+The three new components paint in the shared theme tokens the rest of the chrome
+moved onto — paper, ink, ink-muted, rule — rather than in Tailwind's greys.
+Semantic colour stays Tailwind: red for destructive, amber for the migration
+warning, matching the red the entry cards already use on a delete hover. Brand
+palette and semantic palette are separate things, and only the first belongs in
+the submodule.
+
 ### Header layout
 
 Notices stack full-width directly below the header rather than crowding the
@@ -201,7 +213,7 @@ No test framework is configured and none is being added, per `CLAUDE.md`.
      filename — each confirms and says what is about to be overwritten
   4. Upload a logo under a *different* filename — no prompt, because nothing is
      overwritten
-  5. Clear an image link and a CV link — no prompt
+  5. Clear an image link — no prompt, because dialog Cancel undoes it. Remove the CV — this one *does* prompt, and says the PDF stays reachable
   6. Remove a skill chip, a description line and a link — no prompt
   7. Open each of the four dialogs, edit, close — the styled discard prompt
      appears; close an untouched dialog and it does not

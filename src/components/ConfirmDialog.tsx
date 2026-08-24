@@ -72,7 +72,7 @@ const ConfirmDialog: React.FC<{
     return createPortal(
         <div
             // Above EditorDialog, which pins itself one level below this.
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/45 p-6"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/45 p-6"
             onMouseDown={event => {
                 // mousedown, not click: a click whose press started inside the
                 // panel and released on the backdrop would otherwise cancel a
@@ -85,7 +85,7 @@ const ConfirmDialog: React.FC<{
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
-                className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
+                className="w-full max-w-md rounded-xl bg-paper p-6 shadow-2xl"
             >
                 <div className="flex items-start gap-3">
                     <div
@@ -95,27 +95,27 @@ const ConfirmDialog: React.FC<{
                     >
                         <Icon className="h-5 w-5" />
                     </div>
-                    <h2 id={titleId} className="pt-2 text-lg font-semibold text-gray-900">
+                    <h2 id={titleId} className="pt-2 text-lg font-semibold text-ink">
                         {request.title}
                     </h2>
                 </div>
 
-                <div className="mt-3 text-sm leading-relaxed text-gray-600">{request.body}</div>
+                <div className="mt-3 text-sm leading-relaxed text-ink-muted">{request.body}</div>
 
                 <div className="mt-6 flex flex-wrap justify-end gap-3">
                     <button
                         ref={cancelRef}
                         type="button"
                         onClick={() => onResolve(false)}
-                        className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                        className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-rule-faint hover:text-ink"
                     >
                         {request.cancelLabel ?? 'Cancel'}
                     </button>
                     <button
                         type="button"
                         onClick={() => onResolve(true)}
-                        className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
-                            tone === 'warning' ? 'bg-gray-900 hover:bg-gray-800' : 'bg-red-600 hover:bg-red-700'
+                        className={`rounded-lg px-4 py-2 text-sm font-medium text-paper transition-colors ${
+                            tone === 'warning' ? 'bg-ink hover:bg-ink-muted' : 'bg-red-600 hover:bg-red-700'
                         }`}
                     >
                         {request.confirmLabel ?? 'Confirm'}

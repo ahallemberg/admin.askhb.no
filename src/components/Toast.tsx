@@ -31,7 +31,7 @@ const Toast: React.FC<{
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
             <div
                 role="status"
-                className="pointer-events-auto flex items-center gap-3 rounded-lg bg-gray-900 px-5 py-3 text-sm font-medium text-white shadow-xl"
+                className="pointer-events-auto flex items-center gap-3 rounded-lg bg-ink px-5 py-3 text-sm font-medium text-paper shadow-xl"
             >
                 <Check className="h-4 w-4 text-green-300" />
                 {message}
