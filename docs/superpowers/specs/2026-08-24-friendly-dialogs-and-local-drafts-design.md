@@ -41,7 +41,7 @@ miss, which is why it is a banner rather than a toast.
 | Decision | Choice | Why |
 |---|---|---|
 | Delete interaction | Confirm dialog | Predictable, matches the discard prompts, one component covers every site. An undo toast was considered and rejected: missing it means reloading, which costs every other unsaved edit. |
-| Stale restored draft | Store the forked-from state alongside the draft | The only version that can actually detect that R2 moved. A timestamp alone relies on the author remembering. |
+| Stale restored draft | Store the forked-from state alongside the draft, and never rebase it | The only version that can actually detect that R2 moved. A timestamp alone relies on the author remembering, and a rebased base warns once and then goes quiet. |
 | Save results | Toast on success, persistent banner on failure | Nothing important auto-disappears; nothing trivial blocks. |
 | Image remove button | Confirms, like everything else | Chosen over an exemption: one rule with no exceptions to remember beats a marginally lighter interaction. |
 | `beforeunload` warning | Keep | Weaker now, but unsaved still means askhb.no is showing the old content. |
@@ -123,6 +123,51 @@ type StoredDraft = {
 is roughly twice the size of the draft alone. Both halves are text — logos and
 screenshots are URLs, not blobs — so the whole thing is well under any quota.
 
+#### `base` is sticky, and that is the whole point
+
+There are two different "what R2 holds" values here and collapsing them into one
+is a data-loss bug, so the editor keeps both:
+
+- **`savedSnapshot`** — what R2 is believed to hold *now*, set by a successful
+  load and by a fully successful save. This is what `isDirty` compares against,
+  exactly as today.
+- **`draftBase`** — what R2 held when the *current draft* forked. New state.
+  This is what gets persisted as `base`, and it is **not** rebased when a draft
+  is restored.
+
+They are equal in the ordinary case and diverge only when a draft outlives a
+change to the bucket. Writing `base: savedSnapshot` instead — the obvious
+one-variable version — makes the staleness warning erase its own evidence the
+first time it fires:
+
+1. R2 holds **A**. Edits make draft **D**. Stored: `base: A, draft: D`.
+2. R2 becomes **B**, edited from another browser.
+3. Next load: `loaded` is **B**, stored `base` is **A**, so the warning fires.
+   The author picks *Keep my draft*.
+4. The write effect runs and, with a single variable, rewrites storage as
+   `base: B, draft: D`.
+5. The tab closes without saving.
+6. **The next load compares B against B and says nothing** — while `D` is still
+   forked from A and still overwrites B on the next save.
+
+Keeping `draftBase` unrebased makes step 4 a no-op, so the warning survives
+every reload until it is genuinely resolved. `draftBase` is assigned in exactly
+four places and nowhere else: both branches of the load, a fully successful
+save, and Discard. Nothing else may touch it, and in particular the write effect
+only reads it.
+
+That also means the warning does not need an acknowledgement flag to remember
+that *Keep* was chosen. It is derived, not remembered:
+
+```ts
+const hasDraft  = savedSnapshot !== null && !deepEqual(portfolio, savedSnapshot);
+const isStale   = hasDraft && !deepEqual(draftBase, savedSnapshot);
+```
+
+Gating on `hasDraft` covers the case where the author edits back to what the
+bucket holds: there is then nothing pending to overwrite, so a warning would be
+a lie even though `draftBase` still disagrees.
+
 `version` guards the shape. A mismatch discards the blob rather than migrating
 it, which is also what guarantees a restored draft never re-enters the load-time
 migration path: it is already grouped and already normalised, and `CLAUDE.md` is
@@ -143,28 +188,32 @@ boundary, so a corrupt blob reaching render would blank the page.
 **The existing load is unchanged.** It still fetches, still runs the migration,
 still sets `savedSnapshot` from the fetch, and `savePortfolio` still refuses to
 run while `isLoading || loadError`. All three guards `CLAUDE.md` calls
-load-bearing survive untouched. The restore only replaces `portfolio`:
+load-bearing survive untouched. The restore adds to the load rather than
+changing it: it replaces `portfolio` and sets `draftBase`, and touches nothing
+else.
 
 1. Fetch and normalise as today into `loaded`. `savedSnapshot = loaded`.
-2. No valid stored draft, or its `draft` equals `loaded` — set `portfolio` to
-   `loaded` and clear storage. Identical to today's behaviour.
-3. `draft` differs from `loaded`, and `base` equals `loaded` — restore the
-   draft and show a notice giving its age, with a Discard action.
-4. `draft` differs and `base` differs from `loaded` — **R2 moved under the
-   draft.** Restore the draft anyway and raise a modal naming which of the four
-   files changed. Keeping is the safe action and takes focus, so Escape keeps.
-   Discarding replaces `portfolio` with `loaded`. If the modal is dismissed
-   without a choice the draft is kept and a persistent warning stays in the
-   header, so the situation cannot be forgotten.
-5. **The fetch failed — do not touch storage.** The draft waits for a load that
+2. No valid stored draft, or its `draft` equals `loaded` — set `portfolio` and
+   `draftBase` to `loaded` and clear storage. Identical to today's behaviour.
+3. `draft` differs from `loaded` — restore it: `portfolio = draft`, and
+   **`draftBase = the stored base`, not `loaded`**. Then:
+   - stored `base` equals `loaded` — the ordinary case. Show a notice giving the
+     draft's age, with a Discard action.
+   - stored `base` differs from `loaded` — **R2 moved under the draft.** Raise a
+     modal naming which of the four files changed. Keeping is the safe action
+     and takes focus, so Escape keeps. Discarding sets both `portfolio` and
+     `draftBase` to `loaded`. Dismissing without choosing keeps the draft, and
+     the derived `isStale` above then holds a persistent warning in the header
+     for as long as the divergence lasts — across reloads, not just this one.
+4. **The fetch failed — do not touch storage.** The draft waits for a load that
    works. Clearing it here would destroy the work a transient outage was
    supposed to protect.
 
-Step 4 also fires after a partial save failure, and correctly so. A partial
-failure deliberately leaves `savedSnapshot` alone, because what R2 holds is no
-longer known — so the next load sees a `base` that disagrees with the bucket and
-says so. That is the truth, and it falls out of the rule rather than needing a
-case of its own.
+The stale branch also fires after a partial save failure, and correctly so. A
+partial failure deliberately leaves `savedSnapshot` and `draftBase` alone,
+because what R2 holds is no longer known — so the next load sees a `base` that
+disagrees with the bucket and says so. That is the truth, and it falls out of
+the rule rather than needing a case of its own.
 
 ### Write
 
@@ -172,11 +221,26 @@ One effect on `portfolio`:
 
 - `savedSnapshot` is null (the load has not resolved) — do nothing
 - `portfolio` equals `savedSnapshot` — clear storage
-- otherwise — write `{ version, savedAt: Date.now(), base: savedSnapshot, draft: portfolio }`
+- otherwise — write `{ version, savedAt: Date.now(), base: draftBase, draft: portfolio }`
 
 That single rule gives draft-clearing on a successful save and on Discard for
 free, because both work by making `portfolio` and `savedSnapshot` agree. No
 other call site touches storage.
+
+The effect **reads** `draftBase` and never assigns it. Assigning from in here
+would reintroduce the rebasing bug by the back door, and it would also make the
+effect depend on state it writes.
+
+The first guard is what keeps the empty initial state out of storage. Until the
+fetch resolves, `savedSnapshot` is null and `portfolio` is the blank object with
+its three empty arrays — precisely the value `CLAUDE.md` warns must never be
+written over the bucket. It must never be persisted as a draft either, because a
+restore would feed it straight back in.
+
+StrictMode double-invokes effects, which is harmless here: both passes compute
+the same envelope from the same state and the second write overwrites the first
+with identical bytes. `savedAt` differs by a millisecond or two between them,
+which nothing reads for anything finer than a displayed timestamp.
 
 **No debounce.** `portfolio` changes only on discrete events — a dialog's Save,
 a delete, a reorder, a CV or photo upload. Every text field lives in a dialog's
@@ -188,6 +252,11 @@ shows a quiet notice saying the local backup is unavailable. Failing silently
 would leave the author believing they are protected when they are not.
 
 ### Save feedback
+
+A fully successful save advances **both** `savedSnapshot` and `draftBase` to the
+saved `portfolio`. That is the fourth and last assignment of `draftBase`, and it
+is what resolves a stale divergence: the draft has now been published, so what
+R2 holds and what the draft forked from are the same object again.
 
 Success sets a toast that clears itself after four seconds. Failure sets:
 
@@ -205,9 +274,11 @@ outstanding.
 
 ### Discard button
 
-Header, beside Save, disabled unless dirty. Confirms, then sets `portfolio` to
-`savedSnapshot` — back to what R2 held at page load. The write effect clears
-storage on its own.
+Header, beside Save, disabled unless dirty. Confirms, then sets **both**
+`portfolio` and `draftBase` to `savedSnapshot` — back to what R2 held at page
+load, with the fork point reset to match. The write effect clears storage on its
+own. Resetting `draftBase` here is what stops a discarded divergence from
+leaving a stale warning behind with no draft to justify it.
 
 ### Header layout
 
@@ -254,7 +325,7 @@ Converted from `alert`: the three save outcomes in `PortfolioEditor`.
 | localStorage write throws | Editor continues; one notice says the backup is unavailable. |
 | Save partially fails | Banner naming the files, Retry offered, `saveFailed` set, `savedSnapshot` deliberately not advanced. |
 | Save totally fails | Same banner, wording says nothing reached R2. |
-| Draft's base disagrees with R2 | Modal on load; keeping is the default. |
+| Draft's base disagrees with R2 | Modal on load; keeping is the default. The warning then persists across reloads until a save or a discard resolves it, because `draftBase` is never rebased. |
 
 ## Out of scope
 
@@ -280,7 +351,10 @@ No test framework is configured and none is being added, per `CLAUDE.md`.
      refresh restores nothing
   7. Edit in one browser and save; edit in another that has a stale draft and
      reload — the stale-draft modal names the changed files
-  8. Save successfully — toast appears and fades; a refresh restores nothing
-  9. Save offline — banner appears and stays; the draft survives a refresh
-  10. Escape and backdrop clicks cancel a confirm; tab order stays inside it;
+  8. **From that state, choose Keep, then reload again without saving — the
+     warning must still be there.** This is the regression test for the
+     rebasing bug; a single-variable implementation goes quiet on this reload
+  9. Save successfully — toast appears and fades; a refresh restores nothing
+  10. Save offline — banner appears and stays; the draft survives a refresh
+  11. Escape and backdrop clicks cancel a confirm; tab order stays inside it;
       focus returns to the trigger
