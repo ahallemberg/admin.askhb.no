@@ -1,21 +1,20 @@
-# Friendly confirmations, save feedback, and local draft persistence
+# Local draft persistence
 
 Date: 2026-08-24
 
+Second of two pieces. **Depends on `2026-08-24-friendly-confirmations-design.md`**,
+which builds the `ConfirmDialog`, `Toast` and `Notice` components used here and
+ships first on its own branch. Nothing here starts until that has landed.
+
 ## Problem
 
-Three rough edges in the editor, which turn out to share a solution.
+**An unsaved draft does not survive a refresh.** Close the tab, reload, or lose
+the connection mid-save and every edit since the last successful save is gone. R2
+keeps no versions, so there is nothing to recover from.
 
-1. **Deletes do not ask.** The trash button on an organisation, project or
-   education card removes the entry on the first click, and there is no undo
-   anywhere in the app.
-2. **The prompts that do exist are browser-native.** The four discard-changes
-   prompts are `window.confirm` and the three save outcomes are `alert`. They are
-   unstyleable, sit outside the app's visual language, and on the save path block
-   the page to say something that does not need blocking.
-3. **An unsaved draft does not survive a refresh.** Close the tab, reload, or lose
-   the connection mid-save and every edit since the last successful save is gone.
-   R2 keeps no versions, so there is nothing to recover from.
+Two facts shape everything below. The bucket has no versioning and the worker has
+no DELETE, so a wrong write is permanent. And the editor may be open on more than
+one device, so "what R2 holds" is not a constant across the life of a draft.
 
 ## What local persistence does and does not fix
 
@@ -37,11 +36,8 @@ which is why it is a banner and not a toast.
 
 | Decision | Choice | Why |
 |---|---|---|
-| Delete interaction | Confirm dialog | Predictable, one component covers every site. An undo toast was rejected: missing it means reloading, which costs every other unsaved edit. |
-| What gets confirmed | Anything that destroys something you cannot reconstruct | A flat "confirm every destructive-looking control" inverted the coverage — it prompted on clearing a link, which destroys nothing, and stayed silent on replacing a photo, which is permanent. |
 | Conflict detection | A re-fetch at save time, compared against the draft's fork point | The load-time check alone is blind to the window that actually loses data: R2 moving between page load and save. |
 | Stale fork point | Stored alongside the draft, and never rebased | A rebased fork point warns once and then goes quiet while the danger remains. |
-| Save results | Toast on success, persistent banner on failure | Nothing important auto-disappears; nothing trivial blocks. |
 | Change count | Counted per entry, with ids held parallel to the data | Matching entries by name reports a rename as a delete plus an add, and collides on the blank names new entries start with. |
 | `beforeunload` warning | Keep | Weaker now, but unsaved still means askhb.no is showing the old content. |
 
@@ -51,109 +47,23 @@ which is why it is a banner and not a toast.
 
 | File | Purpose |
 |---|---|
-| `src/components/ConfirmDialog.tsx` | Presentational modal. Owns no state. |
-| `src/components/ConfirmProvider.tsx` | Holds the pending request, renders the one dialog, provides the context. |
-| `src/func/confirmContext.ts` | `createContext` and the `useConfirm` hook. |
 | `src/components/StaleDraftDialog.tsx` | The per-file conflict resolver. Deliberately not a `useConfirm` caller — see below. |
-| `src/components/Toast.tsx` | The transient success message. |
-| `src/components/Notice.tsx` | One header strip: tone, message, optional action, optional dismiss. |
 | `src/func/draftStorage.ts` | Read, write and clear the persisted draft. Every access guarded. |
 | `src/func/changes.ts` | Describe the difference between two portfolios as a list of changes. |
 | `src/func/entryIds.ts` | Mint and carry the parallel entry ids. |
 
-Two existing modules change shape rather than gaining a caller:
+Three existing modules change shape rather than gaining a caller:
 
 | File | Change |
 |---|---|
 | `src/func/data.ts` | Gains `loadPortfolio()` — the fetch-and-normalise block lifted out of `PortfolioEditor`'s load effect, so the load and the save-time check cannot drift apart |
 | `src/components/DraggableList.tsx` | Gains a `keys` prop and reorders it alongside `items`, so callers never recover a permutation by object identity |
+| `src/components/Notice.tsx` | Built in the first piece; gains the restored-draft, stale-draft and storage-unavailable tones |
 
-`confirmContext.ts` is split from the provider because the lint rule that keeps
-fast refresh working objects to a module exporting both a component and a
-non-component.
-
-`ConfirmProvider` is mounted in `App.tsx`, wrapping `PortfolioEditor`. That is the
-whole change to that file.
-
-### Confirmation
-
-`useConfirm()` returns an async function taking a request and resolving to a
-boolean:
-
-```ts
-type ConfirmRequest = {
-    title: string;
-    body: React.ReactNode;
-    confirmLabel?: string;    // default 'Confirm'
-    cancelLabel?: string;     // default 'Cancel'
-    tone?: 'danger' | 'warning';
-};
-```
-
-The four existing discard handlers keep their shape exactly — `if (!(await
-confirm({...}))) return;` — a one-line change each.
-
-Because this replaces `window.confirm`, it re-earns what that gave for free:
-Escape and a backdrop click cancel, `role="alertdialog"` with the title wired
-through `aria-labelledby`, focus moved in on open and trapped while open, Cancel
-focused by default so a stray Return never deletes, and focus returned to the
-trigger on close.
-
-**Focus restoration needs a fallback.** Confirming a card delete unmounts the very
-button that opened the dialog; focusing a detached node is a no-op and focus falls
-to `body`, restarting keyboard navigation at the top of the document — a
-regression against `window.confirm`. On close, check `document.contains(trigger)`
-and fall back to that section's "Add …" button when it is gone.
-
-**The dialog is portalled to `document.body` with an explicit stacking level.**
-`EditorDialog` is fixed to the viewport and creates its own stacking context; a
-confirm rendered as a sibling subtree would sit above it only by accident of tree
-shape. A portal makes it a guarantee.
-
-Note that `EditorDialog` itself has no focus trap and no Escape handler today.
-That is left as-is, but it means Escape closes a confirm and does nothing to the
-editor dialog behind it. Worth revisiting separately; not part of this work.
-
-Only one request is held at a time. **A second request while one is pending
-throws in development and resolves to `cancel` in production**, rather than
-silently resolving `false` — see the StrictMode note under Load for why the
-silent version is dangerous.
-
-#### What gets confirmed, and why
-
-The rule is **confirm anything that destroys something you cannot reconstruct**,
-not "confirm anything with a trash icon". Applied:
-
-**Confirmed — the content is gone and you would have to retype it:**
-
-| Site | Note |
-|---|---|
-| Organisation / project / education card delete | Names the entry; for an organisation, its role count |
-| Role removal in `OrganisationDialog` | A role is title, dates, description and skills |
-| The four discard-changes prompts | Unchanged wording; `PersonalInfoDialog` keeps its photo-replaced variant verbatim |
-| Discard changes (the new header button) | Lists what is about to be lost |
-
-**Confirmed — the bucket object is overwritten the moment you pick a file, and
-there is no versioning and no DELETE to get it back:**
-
-| Site | Note |
-|---|---|
-| `ProfilePictureField` replace | Fixed key; the previous photo is permanently gone. `CLAUDE.md` already says so |
-| `CvSection` replace | Fixed key; same shape |
-| `ImageUploadField` replace | Only when the new file's computed key equals the current value's key — a different filename writes a new object and destroys nothing, so it needs no prompt |
-| The first save after a date migration | Rewrites dates and regroups every experience bucket-wide. `describeMigration` already has the copy |
-
-**Not confirmed — nothing is destroyed:**
-
-| Site | Why |
-|---|---|
-| `ImageUploadField` remove | Clears a link; the object stays in the bucket, and dialog Cancel undoes the field |
-| `CvSection` remove | Clears `cvUrl`; the PDF stays reachable, and Discard restores the field |
-| `EducationDialog.removeDescription`, `RoleEditor.removeSkill`, `ProjectDialog.removeSkill`, `LinksEditor` remove-link | Dialog-local, one field, undone by Cancel and trivially retyped |
-
-This replaces an earlier "one rule, no exceptions" framing. That rule was not
-actually kept — it confirmed the harmless removes while leaving the destructive
-replaces silent, and it had no answer for the four dialog-local removes above.
+`ConfirmDialog`, `ConfirmProvider`, `confirmContext.ts` and `Toast` all come from
+the first piece and are used unchanged, except for the one addition noted under
+the load: the provider's overflow rule has to throw in development rather than
+resolve `false`, which the first piece already specifies.
 
 ### Entry identity
 
@@ -528,12 +438,15 @@ re-fetch finds.
 
 ### Save feedback
 
+The toast-on-success, banner-on-failure behaviour is built in the first piece and
+is not restated here. This section covers only what persistence adds to it.
+
 A fully successful save advances **both** `savedSnapshot` and `draftBase` to the
-saved `portfolio`, and snapshots the ids. That is the fourth and last assignment
-of `draftBase`, and it is what resolves a stale divergence: the draft has been
+saved `portfolio`, and snapshots the ids. It is one of the five `draftBase`
+assignment sites, and it is what resolves a stale divergence: the draft has been
 published, so the two agree again.
 
-Success sets a toast that clears itself after four seconds. Failure sets:
+`saveError` gains two kinds beyond the first piece's `partial` and `total`:
 
 ```ts
 const [saveError, setSaveError] = useState<{
@@ -542,19 +455,18 @@ const [saveError, setSaveError] = useState<{
 } | null>(null);
 ```
 
-`refetch-failed` is its own kind because it is none of the others — nothing was
-attempted, so it is not partial; no PUT failed, so it is not total; and there is
-no conflict. **It must not set `saveFailed`.** Routing it through the ordinary
-failure path would persist `saveFailed: true` into the envelope and tell the next
-load the bucket is mixed when nothing was written — a false alarm that survives
-reloads, which is the same self-perpetuating shape as the rebasing bug.
+`conflict` is the save-time check finding the bucket has moved. `refetch-failed`
+is its own kind because it is none of the others — nothing was attempted, so it is
+not partial; no PUT failed, so it is not total; and there is no conflict.
 
-rendered as a banner naming the files, with Retry, dismissed only by the author or
-by a later successful save.
+**Neither new kind may set `saveFailed`.** Nothing was written in either case, so
+routing them through the ordinary failure path would persist `saveFailed: true`
+into the envelope and tell the next load the bucket is mixed when it is not — a
+false alarm that survives reloads, which is the same self-perpetuating shape as
+the rebasing bug.
 
-`saveFailed` stays a separate boolean and keeps feeding `isDirty`. Dismissing the
-banner must not clear it: the banner is a message, `saveFailed` is the fact that
-R2 is mixed, and the editor has to keep saying so.
+`saveFailed` otherwise behaves as in the first piece: a separate boolean feeding
+`isDirty`, which dismissing the banner must not clear.
 
 **`hasDraft`, not `isDirty`, gates the count and the Discard button.** They differ
 in exactly one state — a partial failure with nothing pending — and that is the
@@ -627,51 +539,41 @@ No test framework is configured and none is being added, per `CLAUDE.md`.
 - `npm run build` — type-checks under `strict` plus the unused-symbol flags
 - `npm run lint` — note `react-hooks/exhaustive-deps` on the write effect
 - Manual walkthrough in `npm run dev`:
-  1. Delete a card of each kind; cancel once, confirm once. Focus lands somewhere
-     sensible after the card disappears
-  2. Remove a role; cancel and confirm
-  3. Replace a profile photo, a CV and a logo under the same filename — each
-     confirms and says what is about to be overwritten. Upload a logo under a
-     *different* filename — no prompt
-  4. Clear an image link and a CV link — no prompt
-  5. Open each of the four dialogs, edit, close — the styled discard prompt
-     appears; close an untouched dialog and it does not
-  6. **Save with a migration pending** — a bucket holding a legacy flat
+  1. **Save with a migration pending** — a bucket holding a legacy flat
      `experiences.json`, or education lacking `dateRange`, with nothing else
      changed. **The save must succeed.** This is the raw-vs-normalised test and
      it goes first, because failing it means the editor cannot save at all on
      exactly the data the migration exists for. It is invisible on an
      already-migrated bucket, so test it against unmigrated data deliberately
-  7. Edit, refresh, confirm the draft returns with its age — **and that the count
+  2. Edit, refresh, confirm the draft returns with its age — **and that the count
      equals the number of edits actually made.** A count matching the total entry
      count instead means the id spaces did not survive the reload
-  8. Rename an entry — the count says one edit, not a delete plus an add
-  9. Add two blank entries — the count distinguishes them — **then reorder them
+  3. Rename an entry — the count says one edit, not a delete plus an add
+  4. Add two blank entries — the count distinguishes them — **then reorder them
      and confirm the count still names them correctly.** The reorder is the half
      that exercises the id alignment
-  10. Reorder a section and drop an entry back where it started — only the first
+  5. Reorder a section and drop an entry back where it started — only the first
       counts as a change
-  11. Edit, refresh, Discard — the editor returns to R2 content and a second
+  6. Edit, refresh, Discard — the editor returns to R2 content and a second
       refresh restores nothing
-  12. Edit in one browser and save; reload another holding a stale draft — only
+  7. Edit in one browser and save; reload another holding a stale draft — only
       genuinely conflicting files are questioned, and untouched ones take the
       bucket's version silently
-  13. **From that resolution, save — it must succeed**, and a reload afterwards
+  8. **From that resolution, save — it must succeed**, and a reload afterwards
       must show no warning. Regression test for `draftBase` advancing on
       resolution; without it every resolved file is unsaveable forever
-  14. **From that state choose Keep instead, then reload again without saving —
+  9. **From that state choose Keep instead, then reload again without saving —
       the warning must still be there.** Regression test for the rebasing bug
-  15. Upload a CV on one device and edit the About text on another, then reload
+  10. Upload a CV on one device and edit the About text on another, then reload
       with both pending — `personalInfo` merges field-wise and neither edit is
       discarded
-  16. Load the editor, change a file from another browser, then save — the
+  11. Load the editor, change a file from another browser, then save — the
       save-time check aborts before writing and names the file
-  17. Save successfully — toast appears and fades; **a refresh restores nothing**,
+  12. Save successfully — toast appears and fades; **a refresh restores nothing**,
       which is the regression test for the write effect's dependency list
-  18. Simulate a partial failure, then Discard, then reload — the mixed-bucket
+  13. Simulate a partial failure, then Discard, then reload — the mixed-bucket
       warning is still there. Tests both that the envelope records `saveFailed`
       and that the load restores it into state
-  19. Take the network down mid-save so the re-fetch itself fails — the banner
+  14. Take the network down mid-save so the re-fetch itself fails — the banner
       says nothing was written, and a reload does **not** claim the bucket is
       mixed
-  20. Escape and backdrop clicks cancel a confirm; tab order stays inside it
