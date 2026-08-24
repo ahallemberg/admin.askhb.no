@@ -2,9 +2,18 @@
 
 Date: 2026-08-24
 
-Second of two pieces. **Depends on `2026-08-24-friendly-confirmations-design.md`**,
-which builds the `ConfirmDialog`, `Toast` and `Notice` components used here and
-ships first on its own branch. Nothing here starts until that has landed.
+Third piece, and the last of this line of work. Two have shipped and this one
+builds on both:
+
+- **Confirmations and save feedback** (`2026-08-24-friendly-confirmations-design.md`)
+  built `ConfirmDialog` behind `useConfirm`, plus `Toast` and `Notice`.
+- **Change indicators** built `src/func/entryIds.ts` and `src/func/changes.ts` —
+  per-entry identity, the diff, the header count and the section badges.
+
+That second one absorbed most of what this document used to specify, and more
+cheaply than it specified it, because a count that never survives a reload needs
+no cross-session machinery. What remains here is the persistence itself, and the
+one piece of id handling that only matters once a draft outlives the page.
 
 ## Problem
 
@@ -49,121 +58,45 @@ which is why it is a banner and not a toast.
 |---|---|
 | `src/components/StaleDraftDialog.tsx` | The per-file conflict resolver. Deliberately not a `useConfirm` caller — see below. |
 | `src/func/draftStorage.ts` | Read, write and clear the persisted draft. Every access guarded. |
-| `src/func/changes.ts` | Describe the difference between two portfolios as a list of changes. |
-| `src/func/entryIds.ts` | Mint and carry the parallel entry ids. |
 
-Three existing modules change shape rather than gaining a caller:
+One existing module changes shape:
 
 | File | Change |
 |---|---|
 | `src/func/data.ts` | Gains `loadPortfolio()` — the fetch-and-normalise block lifted out of `PortfolioEditor`'s load effect, so the load and the save-time check cannot drift apart |
-| `src/components/DraggableList.tsx` | Gains a `keys` prop and reorders it alongside `items`, so callers never recover a permutation by object identity |
-| `src/components/Notice.tsx` | Built in the first piece; gains the restored-draft, stale-draft and storage-unavailable tones |
 
-`ConfirmDialog`, `ConfirmProvider`, `confirmContext.ts` and `Toast` all come from
-the first piece and are used unchanged, except for the one addition noted under
-the load: the provider's overflow rule has to throw in development rather than
-resolve `false`, which the first piece already specifies.
+Everything else is already on `main` and is used unchanged: `ConfirmDialog` and
+`useConfirm`, `Toast`, `Notice`, `entryIds.ts`, `changes.ts`, and
+`DraggableList`'s `keys` prop. The confirm provider already throws in development
+on a second overlapping request rather than resolving `false` — which was written
+for the caller this document adds.
 
-### Entry identity
+### Entry identity across a reload
 
-Entries have no ids: `Organisation`, `EducationItem` and `ProjectItem` are
-positional arrays keyed only by human-readable fields. Describing a change by
-matching on those fields fails in three ways — a rename reads as a delete plus an
-add and names an entry that no longer exists; new entries start blank
-(`BLANK_ORGANISATION.company` is `''`) so two of them collide; and duplicates are
-legitimate, since two stints at one employer is the shape the organisation model
-exists to express.
+`entryIds.ts` already mints an id per entry, holds them index-aligned beside the
+data rather than inside it, and keeps them in step through every handler that
+mutates a section array. `changes.ts` already turns two snapshots plus their ids
+into the list that feeds the count, the badges and — once this ships — the
+Discard prompt. Neither needs changing.
 
-So ids are minted client-side. **They live parallel to the data, never inside
-it:**
+What persistence adds is the one thing that could not come up before: **the id
+space has to survive a reload.**
 
-```ts
-type EntryIds = { experiences: string[]; education: string[]; projects: string[] };
-```
+Today `savedEntryIds` and `entryIds` are minted together at load, so they always
+share a space. Restore a draft and they do not: `entryIds` comes from the
+envelope's `draftIds`, minted in a previous session, while `savedEntryIds` was
+minted from this session's fetch. Diffing across two unrelated spaces reports
+every entry as deleted-plus-added — twelve changes on a portfolio nothing
+meaningful happened to.
 
-index-aligned with the corresponding arrays, snapshotted alongside
-`savedSnapshot`, and persisted in the draft envelope.
+So the envelope carries `baseIds` beside `base`, and the restore branch reads it:
 
-**An id field inside `PortfolioData` would be a bug, not a shortcut.** Ids are
-minted per load, so `deepEqual` against anything derived from R2 would differ on
-the ids alone: the staleness check would fire on every reload and `isDirty` would
-be permanently true after a restore. Keeping them outside also means the PUT path
-needs no stripping step, which matters because that is the path where mistakes
-are unrecoverable.
+> `savedEntryIds[k]` is taken from the envelope's `baseIds[k]` for every key where
+> `base[k]` equals `loaded[k]`. Only a section that genuinely moved in the bucket
+> gets freshly minted ids.
 
-Ids are `crypto.randomUUID()`, not a counter. A counter restarts at zero on every
-page load, which would make two independently-minted id spaces *collide* rather
-than be disjoint — and silently degrade id matching into positional matching
-wearing a hat. Stability comes from reusing stored ids, below, never from the
-minting.
-
-**The id space must survive a reload, or the count is wrong on every restore.**
-The load mints ids for `loaded`, so `savedSnapshotIds` would be a fresh space,
-while a restored `entryIds` comes from the envelope's `draftIds` — minted in a
-previous session. Diffing across two unrelated spaces reports every entry as
-deleted-plus-added. This is what the envelope's `baseIds` is for: on the restore
-branch, `savedSnapshotIds[k]` is taken from `baseIds[k]` for every key where
-`base[k]` equals `loaded[k]`, and only a section that genuinely moved gets fresh
-ids. Without that clause `baseIds` is dead weight nothing reads.
-
-**This is deliberately *unlike* `KeyedRole`, and the difference matters.**
-`OrganisationDialog` holds `{ id, role }` pairs in one array, so id and data
-*cannot* desynchronise — there is no alignment to maintain, it is structural.
-`EntryIds` is two arrays kept aligned by discipline, which is a weaker guarantee
-bought for a much smaller diff: pairs would mean deriving `portfolio` at the
-boundary and memoising the derive, since a fresh object per render would fire the
-write effect continuously. The one thing carried over from `KeyedRole` is minting
-outside the state updater, for its original reason: StrictMode invokes updaters
-twice and an id generated inside one is minted for a value React discards.
-
-Because the alignment is maintained rather than structural, the one path that
-cannot maintain it by construction has to be fixed at source. **`DraggableList`
-gains a `keys` prop** and applies its existing splice arithmetic to both arrays,
-calling `onReorder(newItems, newKeys)`. Today it passes only the reordered array,
-so a caller would have to recover the permutation by object identity — which is
-already broken for a reachable case: `ProjectDialog` seeds its draft from the
-frozen module-level `BLANK_PROJECT` and saves that same reference if nothing is
-typed, so adding two blank projects puts one object in two slots and `indexOf`
-returns the same index for both. Three lines in one generic component removes the
-fragility instead of documenting it at nine call sites.
-
-The handlers that mutate a section array mutate the matching id array identically.
-Note the shape: the three `handleSave*` handlers are add-*or*-edit, branching on
-`editIndex`, so they are six operations in three functions — and **the edit branch
-must deliberately leave the id alone.** That is the branch a rename depends on,
-and it is the easiest one to get wrong. `entryIds.ts` exposes the operations so
-the symmetry is enforced in one place.
-
-`entryIds` is React state, not a value derived during render. A fresh object each
-render would put a new identity in the write effect's dependency list and write to
-localStorage continuously.
-
-### Change description
-
-`changes.ts` turns two portfolios plus their id arrays into a list:
-
-```ts
-type Change = { kind: 'added' | 'edited' | 'deleted' | 'reordered'; label: string };
-```
-
-One change is **one entry affected**, one section reordered, personal information,
-or the CV link. An entry edited in five fields counts once — the number answers
-"how much am I about to publish", which is a question about entries.
-
-Matching is by id, so a rename is one edit. Reordering is detected by comparing id
-order, content-independent: `DraggableList` rebuilds the array on any drop where
-the indices differ, including a drop that lands an entry back where it started, so
-"the reorder handler fired" is not the same question as "the order changed".
-
-The count renders as a pill in the header that opens to name each change, and the
-Discard dialog lists the same set.
-
-**`saveFailed` is not a change and must not be counted.** After a partial failure
-followed by Discard, `portfolio` equals `savedSnapshot` so the list is empty,
-while `isDirty` is still true because R2 really is mixed. Rendering that as "0
-unsaved changes" is wrong. The count is computed from the change list alone, and
-the mixed-bucket state is its own always-visible strip.
+Without that clause `baseIds` is dead weight nothing reads, and the count is
+wrong on every restore — on the ordinary path, not an edge case.
 
 ### Draft persistence
 
@@ -239,12 +172,15 @@ everything really is resolved.
 The warning is derived, not remembered, so *Keep* needs no acknowledgement flag:
 
 ```ts
-const hasDraft = savedSnapshot !== null && !deepEqual(portfolio, savedSnapshot);
-const isStale  = hasDraft && !deepEqual(draftBase, savedSnapshot);
+const isStale = changes.length > 0 && !deepEqual(draftBase, savedSnapshot);
 ```
 
-Gating on `hasDraft` covers an author who edits back to what the bucket holds:
-there is then nothing pending to overwrite, so a warning would be a lie.
+`changes` is the array the editor already computes for the count, so this reuses
+it rather than restating the same comparison a second way.
+
+The first half covers an author who edits back to what the bucket holds: there is
+then nothing pending to overwrite, so a warning would be a lie even though
+`draftBase` still disagrees.
 
 ### Load
 
@@ -329,7 +265,7 @@ for them. The asymmetry is a decision, not an oversight.
 ### Write
 
 One effect, with dependencies
-`[portfolio, savedSnapshot, draftBase, entryIds, saveFailed, failedFiles]`:
+`[portfolio, savedSnapshot, draftBase, entryIds, savedEntryIds, saveFailed, failedFiles]`:
 
 - `savedSnapshot` is null (the load has not resolved) — do nothing
 - `portfolio` equals `savedSnapshot` **and `saveFailed` is false** — clear storage
@@ -341,6 +277,10 @@ calls `setSavedSnapshot(portfolio)` with the *same object reference*, so
 not re-run, and storage would never be cleared after a successful save — leaving an
 envelope with a stale `savedAt` and a `base` two states behind. It self-heals on
 the next load, which makes it worse: the bug is invisible in manual testing.
+
+`savedEntryIds` joins them because the envelope's `baseIds` is written from it,
+and it changes on exactly the two occasions the envelope must be rewritten: a
+successful save and a restore.
 
 `saveFailed` and `failedFiles` are in the list for the same class of reason, and
 omitting them breaks the clause below outright. A partial failure changes
@@ -468,24 +408,42 @@ the rebasing bug.
 `saveFailed` otherwise behaves as in the first piece: a separate boolean feeding
 `isDirty`, which dismissing the banner must not clear.
 
-**`hasDraft`, not `isDirty`, gates the count and the Discard button.** They differ
-in exactly one state — a partial failure with nothing pending — and that is the
-state where `isDirty` would enable a Discard button that confirms and then does
-nothing, and render a count of zero.
+**The Discard button is gated on the change list, not on `isDirty`.** The editor
+already draws this distinction: the count pill renders when `changes.length > 0`
+and falls back to a plain "Unsaved changes" when the count is zero but `isDirty`
+holds. That fallback exists for exactly one state — a partial failure with nothing
+pending — and Discard belongs on the same side of it as the count, or it would
+confirm and then do nothing.
+
+`changes.length > 0` and `!deepEqual(portfolio, savedSnapshot)` agree, because
+`describeChanges` covers every key of `PortfolioData`: the personal details, the
+CV link, and the three sections. Using the change list is the same test said in
+the terms the button's own prompt is about to use.
 
 ### Discard button
 
-Header, beside Save, disabled unless `hasDraft`. Confirms, listing the changes,
-then sets **both** `portfolio` and `draftBase` to `savedSnapshot`. Resetting
-`draftBase` here is what stops a discarded divergence from leaving a stale warning
+Header, beside Save, disabled unless there are changes. Confirms, listing them
+through the same `labelFor` the count breakdown already uses — one wording for
+the same fact in both places — then sets **both** `portfolio` and `draftBase` to
+`savedSnapshot`. Resetting `draftBase` here is what stops a discarded divergence from leaving a stale warning
 behind with no draft to justify it.
+
+`entryIds` is restored to `savedEntryIds` at the same time. It is the same
+requirement one level down: the snapshot and the live data have to be described
+by one id space, and a discard that reset only the data would leave the count
+diffing a restored draft's ids against the ones the bucket's content was minted
+with.
 
 ### Header layout
 
-The header row gains the change-count pill and the Discard button. Notices stack
-full-width below the header rather than crowding that row, which now has to hold
-up to five: restored draft, stale draft, mixed bucket, save failure, storage
-unavailable.
+The change-count pill and the section badges are already there. The header row
+gains the Discard button beside Save, and the notice stack below the header —
+which already carries the save-failure banner — has to hold up to five: restored
+draft, stale draft, mixed bucket, save failure, storage unavailable.
+
+That is enough strips that they need an order. Most-actionable first: anything
+saying the bucket is currently wrong outranks anything saying this session has
+something pending.
 
 ## Error handling
 
@@ -546,34 +504,32 @@ No test framework is configured and none is being added, per `CLAUDE.md`.
      exactly the data the migration exists for. It is invisible on an
      already-migrated bucket, so test it against unmigrated data deliberately
   2. Edit, refresh, confirm the draft returns with its age — **and that the count
-     equals the number of edits actually made.** A count matching the total entry
-     count instead means the id spaces did not survive the reload
-  3. Rename an entry — the count says one edit, not a delete plus an add
-  4. Add two blank entries — the count distinguishes them — **then reorder them
-     and confirm the count still names them correctly.** The reorder is the half
-     that exercises the id alignment
-  5. Reorder a section and drop an entry back where it started — only the first
-      counts as a change
-  6. Edit, refresh, Discard — the editor returns to R2 content and a second
-      refresh restores nothing
-  7. Edit in one browser and save; reload another holding a stale draft — only
-      genuinely conflicting files are questioned, and untouched ones take the
-      bucket's version silently
-  8. **From that resolution, save — it must succeed**, and a reload afterwards
-      must show no warning. Regression test for `draftBase` advancing on
-      resolution; without it every resolved file is unsaveable forever
-  9. **From that state choose Keep instead, then reload again without saving —
-      the warning must still be there.** Regression test for the rebasing bug
-  10. Upload a CV on one device and edit the About text on another, then reload
-      with both pending — `personalInfo` merges field-wise and neither edit is
-      discarded
-  11. Load the editor, change a file from another browser, then save — the
-      save-time check aborts before writing and names the file
-  12. Save successfully — toast appears and fades; **a refresh restores nothing**,
-      which is the regression test for the write effect's dependency list
-  13. Simulate a partial failure, then Discard, then reload — the mixed-bucket
-      warning is still there. Tests both that the envelope records `saveFailed`
-      and that the load restores it into state
-  14. Take the network down mid-save so the re-fetch itself fails — the banner
-      says nothing was written, and a reload does **not** claim the bucket is
-      mixed
+     equals the number of edits actually made.** A count equal to the total entry
+     count instead means `baseIds` was not read and the two id spaces are being
+     diffed against each other. This is the one change-counting behaviour this
+     piece can break; the rest — a rename counting once, blank entries staying
+     distinct, a drag landing back where it started counting for nothing — is
+     already covered on `main`
+  3. Edit, refresh, Discard — the editor returns to R2 content and a second
+     refresh restores nothing
+  4. Edit in one browser and save; reload another holding a stale draft — only
+     genuinely conflicting files are questioned, and untouched ones take the
+     bucket's version silently
+  5. **From that resolution, save — it must succeed**, and a reload afterwards
+     must show no warning. Regression test for `draftBase` advancing on
+     resolution; without it every resolved file is unsaveable forever
+  6. **From that state choose Keep instead, then reload again without saving —
+     the warning must still be there.** Regression test for the rebasing bug
+  7. Upload a CV on one device and edit the About text on another, then reload
+     with both pending — `personalInfo` merges field-wise and neither edit is
+     discarded
+  8. Load the editor, change a file from another browser, then save — the
+     save-time check aborts before writing and names the file
+  9. Save successfully — toast appears and fades; **a refresh restores nothing**,
+     which is the regression test for the write effect's dependency list
+  10. Simulate a partial failure, then Discard, then reload — the mixed-bucket
+     warning is still there. Tests both that the envelope records `saveFailed`
+     and that the load restores it into state
+  11. Take the network down mid-save so the re-fetch itself fails — the banner
+     says nothing was written, and a reload does **not** claim the bucket is
+     mixed
