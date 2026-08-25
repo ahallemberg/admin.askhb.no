@@ -8,7 +8,7 @@ import ProjectPreview from "./preview/ProjectPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
 import { useConfirm } from "../func/confirmContext";
-import { LOGO_DIR, SCREENSHOT_DIR } from "../constants/app";
+import { PROJECT_LOGO_DIR, SCREENSHOT_DIR } from "../constants/app";
 
 const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
@@ -126,16 +126,20 @@ const ProjectDialog: React.FC<{
                 </div>
 
                 {/*
-                 * Projects share LOGO_DIR with organisations rather than taking a
-                 * directory of their own: the uploader already keys each mark
-                 * under a slug plus a random suffix, so two owners cannot collide
-                 * even when named alike, and a second constant would only give
-                 * the two paths somewhere to drift apart.
+                 * Its own directory, not the organisations' LOGO_DIR. The suffix
+                 * entryPrefix adds is a fingerprint of the owner's name, not a
+                 * random one -- deterministic so that re-uploading an entry's
+                 * asset overwrites in place -- so the directory is the only thing
+                 * separating a project called "Ascend NTNU" from the employer of
+                 * the same name. Shared, both would compute one prefix, and a
+                 * logo.svg uploaded on either side would silently take the
+                 * other's object: uploads publish on pick, and there is no
+                 * versioning behind them and no DELETE to undo it with.
                  */}
                 <ImageUploadField
                     label="Logo (optional)"
                     value={draft.logoUrl}
-                    dir={LOGO_DIR}
+                    dir={PROJECT_LOGO_DIR}
                     owner={draft.name}
                     ownerLabel="project name"
                     onChange={(logoUrl) => update({ logoUrl })}
