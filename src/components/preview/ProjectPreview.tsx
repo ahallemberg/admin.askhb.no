@@ -1,4 +1,5 @@
 import type { ProjectItem } from '../../types/props';
+import { DEFAULT_LABEL } from '../../func/links';
 import LogoMark from './LogoMark';
 import RichTextPreview from './RichTextPreview';
 
@@ -18,7 +19,21 @@ import RichTextPreview from './RichTextPreview';
  */
 const CARD_CLASS = 'flex h-full flex-col rounded-[3px] border border-rule bg-rule-faint';
 
+/*
+ * Same defaulting RolePreview does, and for the same reason: the project in hand
+ * is whatever the dialog currently holds, so a link typed without a label yet
+ * previews under the default rather than as a bare arrow.
+ */
+const previewLinks = (project: ProjectItem) =>
+    (project.links ?? [])
+        .filter((link) => typeof link?.url === 'string' && link.url.trim() !== '')
+        .map((link) => ({
+            url: link.url,
+            label: typeof link.label === 'string' && link.label.trim() !== '' ? link.label : DEFAULT_LABEL,
+        }));
+
 const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
+    const links = previewLinks(project);
     const skills = project.skills ?? [];
     const name = typeof project.name === 'string' ? project.name.trim() : '';
 
@@ -83,6 +98,22 @@ const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
                                 </li>
                             ))}
                         </ul>
+                    )}
+
+                    {/* Spans, not anchors, like every other link in this pane: a
+                        click that navigates away from a dialog holding an unsaved
+                        draft destroys the draft. */}
+                    {links.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+                            {links.map((link, index) => (
+                                <span
+                                    key={index}
+                                    className="text-[13px] text-accent underline decoration-1 underline-offset-4"
+                                >
+                                    {link.label} <span aria-hidden="true">&rarr;</span>
+                                </span>
+                            ))}
+                        </div>
                     )}
 
                     {(project.figure || project.url) && (

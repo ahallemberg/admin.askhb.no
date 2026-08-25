@@ -1047,6 +1047,8 @@ const PortfolioEditor: React.FC = () => {
                                     : BLANK_PROJECT
                             }
                             isOpen={projectDialog.isOpen}
+                            publishedPages={publishedPages}
+                            pagesLoadFailed={pagesLoadFailed}
                             isEditing={projectDialog.editIndex !== undefined}
                             onClose={() => setProjectDialog({ isOpen: false })}
                             onSave={handleSaveProject}
