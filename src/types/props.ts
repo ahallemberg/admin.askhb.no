@@ -84,6 +84,10 @@ interface ProjectItem {
   figure?: string;
   figureCaption?: string;
   skills?: string[];
+  // Write-ups for the project, in the same shape a role uses. Also what lets
+  // pages.askhb.no put this project's mark on its write-up page: that build
+  // matches a note by the slug in a link pointing at it.
+  links?: PortfolioLink[];
 }
 
 interface ExperienceItem {

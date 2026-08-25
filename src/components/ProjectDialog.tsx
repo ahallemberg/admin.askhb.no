@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ProjectItem } from "../types/props";
 import EditorDialog from "./EditorDialog";
 import ImageUploadField from "./ImageUploadField";
+import LinksEditor from "./LinksEditor";
 import ScreenshotCapture from "./ScreenshotCapture";
 import SkillsEditor from "./SkillsEditor";
 import ProjectPreview from "./preview/ProjectPreview";
@@ -9,6 +10,7 @@ import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
 import { useConfirm } from "../func/confirmContext";
 import { PROJECT_LOGO_DIR, SCREENSHOT_DIR } from "../constants/app";
+import type { PublishedPage } from "../func/pages";
 
 const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
 
@@ -27,9 +29,11 @@ const ProjectDialog: React.FC<{
     project: ProjectItem;
     isOpen: boolean;
     isEditing: boolean;
+    publishedPages: PublishedPage[];
+    pagesLoadFailed: boolean;
     onClose: () => void;
     onSave: (project: ProjectItem) => void;
-}> = ({ project, isOpen, isEditing, onClose, onSave }) => {
+}> = ({ project, isOpen, isEditing, publishedPages, pagesLoadFailed, onClose, onSave }) => {
     const confirm = useConfirm();
     const [draft, setDraft] = useState<ProjectItem>(project);
     // A skill typed but not yet added lives only here, so handleClose has to know
@@ -214,6 +218,22 @@ const ProjectDialog: React.FC<{
                         Figure and caption work as a pair — set both, or neither.
                     </p>
                 )}
+
+                {/*
+                 * The same picker a role gets, and for more than symmetry: a link
+                 * chosen from the published list is spelled the way the site
+                 * publishes it, and pages.askhb.no matches a write-up to its mark
+                 * on exactly that string. A hand-typed url that differs by a
+                 * capital or a space is a 404 there and an unmarked page here.
+                 */}
+                <LinksEditor
+                    links={draft.links ?? []}
+                    pages={publishedPages}
+                    pagesLoadFailed={pagesLoadFailed}
+                    // Absent rather than [], so an emptied list leaves no
+                    // "links": [] behind in the JSON.
+                    onChange={(links) => update({ links: links.length > 0 ? links : undefined })}
+                />
 
                 <SkillsEditor
                     label="Skills (optional)"
