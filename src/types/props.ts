@@ -65,6 +65,12 @@ interface ProjectItem {
   name: string;
   description: string;
   url?: string;
+  // Named as Organisation names it, because askhb.no renders both through the
+  // same LogoMark. Absent means the card shows no mark at all rather than a
+  // reserved empty box.
+  logoUrl?: string;
+  // Optical size correction, as on an organisation. 1 is unscaled.
+  logoScale?: number;
   screenshotUrl?: string;
   // The same shot with the site in dark mode, for a site that has one. Absent
   // means the site has no dark variant, or nobody has captured it — askhb.no

@@ -1,4 +1,5 @@
 import type { ProjectItem } from '../../types/props';
+import LogoMark from './LogoMark';
 import RichTextPreview from './RichTextPreview';
 
 /*
@@ -54,9 +55,18 @@ const ProjectPreview: React.FC<{ project: ProjectItem }> = ({ project }) => {
                 )}
 
                 <div className="flex flex-1 flex-col p-5">
-                    {name
-                        ? <h3 className="font-serif text-lg font-semibold text-ink">{name}</h3>
-                        : <h3 className="font-serif text-lg font-semibold text-ink-muted italic">Untitled project</h3>}
+                    {/*
+                     * The mark groups with the heading exactly as it does on the
+                     * site and on an organisation. LogoMark renders nothing when
+                     * there is no url, so a project without a logo keeps the flush
+                     * left heading it has today.
+                     */}
+                    <div className="flex items-center gap-3">
+                        <LogoMark url={project.logoUrl} scale={project.logoScale} />
+                        {name
+                            ? <h3 className="min-w-0 font-serif text-lg font-semibold text-ink">{name}</h3>
+                            : <h3 className="min-w-0 font-serif text-lg font-semibold text-ink-muted italic">Untitled project</h3>}
+                    </div>
 
                     <p className="mt-2 leading-relaxed text-ink-muted">
                         <RichTextPreview text={project.description} />
