@@ -8,9 +8,15 @@ import ProjectPreview from "./preview/ProjectPreview";
 import PreviewSurface from "./preview/PreviewSurface";
 import { deepEqual } from "../func/compare";
 import { useConfirm } from "../func/confirmContext";
-import { SCREENSHOT_DIR } from "../constants/app";
+import { LOGO_DIR, SCREENSHOT_DIR } from "../constants/app";
 
 const FIELD_CLASS = "w-full p-3 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-colors";
+
+// The bounds offered by the logo scale input, matching OrganisationDialog. Values
+// outside them are still stored — nothing enforces an input's min/max — so they are
+// called out instead, and the preview renders whatever is stored, unclamped.
+const SCALE_MIN = 0.5;
+const SCALE_MAX = 2;
 
 // Optional text is stored absent rather than empty, so a cleared field leaves no
 // `"url": ""` behind for askhb.no to render as a link to nowhere. Same rule as
@@ -33,6 +39,9 @@ const ProjectDialog: React.FC<{
     const update = (patch: Partial<ProjectItem>) => setDraft(prev => ({ ...prev, ...patch }));
 
     const skills = draft.skills ?? [];
+
+    const scale = draft.logoScale;
+    const scaleOutOfRange = scale !== undefined && (scale < SCALE_MIN || scale > SCALE_MAX);
 
     const addSkill = () => {
         if (newSkill && !skills.includes(newSkill)) {
@@ -114,6 +123,53 @@ const ProjectDialog: React.FC<{
                     <p className="mt-1 text-xs text-ink-faint">
                         Supports [text](https://example.com), **bold** and *italic*.
                     </p>
+                </div>
+
+                {/*
+                 * Projects share LOGO_DIR with organisations rather than taking a
+                 * directory of their own: the uploader already keys each mark
+                 * under a slug plus a random suffix, so two owners cannot collide
+                 * even when named alike, and a second constant would only give
+                 * the two paths somewhere to drift apart.
+                 */}
+                <ImageUploadField
+                    label="Logo (optional)"
+                    value={draft.logoUrl}
+                    dir={LOGO_DIR}
+                    owner={draft.name}
+                    ownerLabel="project name"
+                    onChange={(logoUrl) => update({ logoUrl })}
+                />
+
+                <div>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">Logo scale (optional)</label>
+                    <input
+                        type="number"
+                        step="0.05"
+                        min={SCALE_MIN}
+                        max={SCALE_MAX}
+                        value={scale ?? ''}
+                        onChange={(e) => {
+                            // A number input reads back an empty string for
+                            // anything it cannot parse, and that coerces to zero —
+                            // which would scale the mark out of existence. Store
+                            // nothing instead, and never let a NaN reach the JSON.
+                            const parsed = Number(e.target.value);
+                            const next = e.target.value === '' || !Number.isFinite(parsed) ? undefined : parsed;
+                            update({ logoScale: next });
+                        }}
+                        className={FIELD_CLASS}
+                    />
+                    <p className="mt-1 text-xs text-ink-faint">
+                        Optical size correction. Marks differ in ink coverage, so equal boxes look
+                        unequal. 1 is unscaled. The preview shows the result at the size the site
+                        renders it.
+                    </p>
+                    {scaleOutOfRange && (
+                        <p className="mt-1 text-sm text-amber-700">
+                            Outside the usual {SCALE_MIN}–{SCALE_MAX} range. It is stored as typed.
+                        </p>
+                    )}
                 </div>
 
                 <ImageUploadField
